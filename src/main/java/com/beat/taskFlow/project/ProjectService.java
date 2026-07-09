@@ -1,42 +1,62 @@
 package com.beat.taskFlow.project;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
 
-    public ProjectService(ProjectRepository projectRepository) {
-        this.projectRepository = projectRepository;
+    private ProjectResponse convertToResponse(Project project) {
+        return new ProjectResponse(
+                project.getId(),
+                project.getName(),
+                project.getDescription(),
+                project.getCreatedAt(),
+                project.getUpdatedAt()
+        );
     }
 
-    public Project createProject(Project project) {
-        return projectRepository.save(project);
+    public ProjectResponse createProject(CreateProjectRequest request) {
+        Project project = new Project();
+        project.setName(request.name());
+        project.setDescription(request.description());
+        
+        Project savedProject = projectRepository.save(project);
+        return convertToResponse(savedProject);
     }
 
-    public List<Project> getAllProjects() {
-        return projectRepository.findAll();
+    public List<ProjectResponse> getAllProjects() {
+        return projectRepository.findAll().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
     }
 
-    public Project getProjectById(Long id) {
-        return projectRepository.findById(id)
+    public ProjectResponse getProjectById(Long id) {
+        Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
+        return convertToResponse(project);
     }
 
-    public Project updateProject(Long id, Project updatedProject) {
+    public ProjectResponse updateProject(Long id, UpdateProjectRequest request) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
 
-        Project project = getProjectById(id);
+        project.setName(request.name());
+        project.setDescription(request.description());
 
-        project.setName(updatedProject.getName());
-        project.setDescription(updatedProject.getDescription());
-
-        return projectRepository.save(project);
+        Project updatedProject = projectRepository.save(project);
+        return convertToResponse(updatedProject);
     }
 
     public void deleteProject(Long id) {
+        if (!projectRepository.existsById(id)) {
+            throw new RuntimeException("Project not found");
+        }
         projectRepository.deleteById(id);
     }
 }
