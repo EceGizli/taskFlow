@@ -1,12 +1,15 @@
 package com.beat.taskFlow.task.service;
 
+import com.beat.taskFlow.common.exception.InvalidTaskStatusException;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.project.entity.concretes.Project;
 import com.beat.taskFlow.project.repository.ProjectRepository;
 import com.beat.taskFlow.task.dto.requests.CreateTaskRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskRequest;
+import com.beat.taskFlow.task.dto.requests.UpdateTaskStatusRequest;
 import com.beat.taskFlow.task.dto.responses.TaskResponse;
 import com.beat.taskFlow.task.entity.concretes.Task;
+import com.beat.taskFlow.task.entity.enums.TaskStatus;
 import com.beat.taskFlow.task.repository.TaskRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -72,6 +75,23 @@ public class TaskService {
         return mapToResponse(updatedTask);
     }
 
+    public TaskResponse updateTaskStatus(Long id, UpdateTaskStatusRequest request) {
+
+        Task task = taskRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + id));
+
+        TaskStatus currentStatus = task.getStatus();
+        TaskStatus newStatus = request.status();
+
+        validateStatusTransition(currentStatus, newStatus);
+
+        task.setStatus(newStatus);
+
+        Task updatedTask = taskRepository.save(task);
+
+        return mapToResponse(updatedTask);
+    }
+
     public void deleteTask(Long id) {
 
         Task task = taskRepository.findById(id)
@@ -80,7 +100,25 @@ public class TaskService {
         taskRepository.delete(task);
     }
 
+    private void validateStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {
+
+        if (currentStatus == TaskStatus.DONE &&
+                newStatus != TaskStatus.DONE) {
+
+            throw new InvalidTaskStatusException(
+                    "Tamamlanan görev tekrar başka bir duruma geçirilemez.");
+        }
+
+        if (currentStatus == TaskStatus.TODO &&
+                newStatus == TaskStatus.DONE) {
+
+            throw new InvalidTaskStatusException(
+                    "Görev tamamlanmadan önce IN_PROGRESS durumuna geçirilmelidir.");
+        }
+    }
+
     private TaskResponse mapToResponse(Task task) {
+
         return new TaskResponse(
                 task.getId(),
                 task.getTitle(),

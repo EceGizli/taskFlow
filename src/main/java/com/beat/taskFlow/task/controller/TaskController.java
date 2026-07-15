@@ -2,6 +2,7 @@ package com.beat.taskFlow.task.controller;
 
 import com.beat.taskFlow.task.dto.requests.CreateTaskRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskRequest;
+import com.beat.taskFlow.task.dto.requests.UpdateTaskStatusRequest;
 import com.beat.taskFlow.task.dto.responses.TaskResponse;
 import com.beat.taskFlow.task.service.TaskService;
 import jakarta.validation.Valid;
@@ -47,6 +48,14 @@ public class TaskController {
             @Valid @RequestBody UpdateTaskRequest request) {
 
         return taskService.updateTask(id, request);
+    }
+
+    @PatchMapping("/tasks/{id}/status")
+    public TaskResponse updateTaskStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateTaskStatusRequest request) {
+
+        return taskService.updateTaskStatus(id, request);
     }
 
     @DeleteMapping("/tasks/{id}")
