@@ -1,5 +1,6 @@
 package com.beat.taskFlow.task.controller;
 
+import com.beat.taskFlow.task.dto.requests.BulkUpdateStatusRequest;
 import com.beat.taskFlow.task.dto.requests.CreateTaskRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskStatusRequest;
@@ -56,6 +57,21 @@ public class TaskController {
             @Valid @RequestBody UpdateTaskStatusRequest request) {
 
         return taskService.updateTaskStatus(id, request);
+    }
+
+    @PatchMapping("/tasks/bulk-status")
+    public List<TaskResponse> bulkUpdateStatus(
+            @Valid @RequestBody BulkUpdateStatusRequest request) {
+        
+        return taskService.bulkUpdateStatus(request);
+    }
+
+    @PostMapping("/tasks/{id}/duplicate")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TaskResponse duplicateTask(
+            @PathVariable Long id) {
+        
+        return taskService.duplicateTask(id);
     }
 
     @DeleteMapping("/tasks/{id}")

@@ -36,6 +36,9 @@ public class Task extends BaseEntity {
 
     private LocalDate dueDate;
 
+    @Column(name = "estimated_hours")
+    private Integer estimatedHours;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
