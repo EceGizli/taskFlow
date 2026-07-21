@@ -1,6 +1,8 @@
 package com.beat.taskFlow.user.controller;
 
+import com.beat.taskFlow.user.dto.requests.LoginRequest;
 import com.beat.taskFlow.user.dto.requests.RegisterRequest;
+import com.beat.taskFlow.user.dto.responses.LoginResponse;
 import com.beat.taskFlow.user.dto.responses.RegisterResponse;
 import com.beat.taskFlow.user.service.UserService;
 import jakarta.validation.Valid;
@@ -21,5 +23,12 @@ public class AuthController {
             @Valid @RequestBody RegisterRequest request) {
 
         return userService.register(request);
+    }
+
+    @PostMapping("/login")
+    public LoginResponse login(
+            @Valid @RequestBody LoginRequest request) {
+
+        return userService.login(request);
     }
 }
