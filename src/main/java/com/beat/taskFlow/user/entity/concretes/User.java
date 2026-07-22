@@ -20,6 +20,8 @@ import java.util.List;
 @Builder
 public class User extends BaseEntity implements UserDetails {
 
+	private static final long serialVersionUID = 1L;
+	
     @Column(nullable = false, length = 100)
     private String name;
 
