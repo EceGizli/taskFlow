@@ -2,6 +2,7 @@ package com.beat.taskFlow.user.dto.requests;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record RegisterRequest(
@@ -16,7 +17,11 @@ public record RegisterRequest(
         String email,
 
         @NotBlank(message = "Şifre boş bırakılamaz")
-        @Size(min = 6, max = 100, message = "Şifre 6 ile 100 karakter arasında olmalıdır")
+        @Size(min = 8, max = 100, message = "Şifre 8 ile 100 karakter arasında olmalıdır")
+        @Pattern(
+                regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$",
+                message = "Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir."
+        )
         String password
 
 ) {}

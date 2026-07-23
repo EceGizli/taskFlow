@@ -3,11 +3,13 @@ package com.beat.taskFlow.user.controller;
 import com.beat.taskFlow.user.dto.requests.LoginRequest;
 import com.beat.taskFlow.user.dto.requests.RegisterRequest;
 import com.beat.taskFlow.user.dto.responses.LoginResponse;
+import com.beat.taskFlow.user.dto.responses.MeResponse;
 import com.beat.taskFlow.user.dto.responses.RegisterResponse;
 import com.beat.taskFlow.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -30,5 +32,11 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request) {
 
         return userService.login(request);
+    }
+
+    @GetMapping("/me")
+    public MeResponse me(Authentication authentication) {
+
+        return userService.me(authentication);
     }
 }
