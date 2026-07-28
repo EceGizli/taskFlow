@@ -8,41 +8,44 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/projects")
-@RequiredArgsConstructor 
+@RequiredArgsConstructor
 public class ProjectController {
 
     private final ProjectService projectService;
 
-    @PostMapping
-    public ResponseEntity<ProjectResponse> createProject(@Valid @RequestBody CreateProjectRequest request) {
-        ProjectResponse created = projectService.createProject(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
-    }
-
     @GetMapping
-    public ResponseEntity<List<ProjectResponse>> getAllProjects() {
-        return ResponseEntity.ok(projectService.getAllProjects());
+    public ResponseEntity<List<ProjectResponse>> getAllProjects(Authentication authentication) {
+        return ResponseEntity.ok(projectService.getAllProjects(authentication));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProjectResponse> getProjectById(@PathVariable Long id) {
-        return ResponseEntity.ok(projectService.getProjectById(id));
+    public ResponseEntity<ProjectResponse> getProjectById(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(projectService.getProjectById(id, authentication));
+    }
+
+    @PostMapping
+    public ResponseEntity<ProjectResponse> createProject(@Valid @RequestBody CreateProjectRequest request,
+                                                         Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(projectService.createProject(request, authentication));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ProjectResponse> updateProject(@PathVariable Long id, @Valid @RequestBody UpdateProjectRequest request) {
-        return ResponseEntity.ok(projectService.updateProject(id, request));
+    public ResponseEntity<ProjectResponse> updateProject(@PathVariable Long id,
+                                                         @Valid @RequestBody UpdateProjectRequest request,
+                                                         Authentication authentication) {
+        return ResponseEntity.ok(projectService.updateProject(id, request, authentication));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteProject(@PathVariable Long id) {
-        projectService.deleteProject(id);
+    public ResponseEntity<Void> deleteProject(@PathVariable Long id, Authentication authentication) {
+        projectService.deleteProject(id, authentication);
         return ResponseEntity.noContent().build();
     }
 }

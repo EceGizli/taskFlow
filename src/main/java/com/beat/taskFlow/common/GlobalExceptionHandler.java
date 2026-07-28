@@ -1,16 +1,18 @@
 package com.beat.taskFlow.common;
 
+import com.beat.taskFlow.common.exception.AccountLockedException;
 import com.beat.taskFlow.common.exception.AlreadyExistsException;
 import com.beat.taskFlow.common.exception.InvalidTaskStatusException;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import com.beat.taskFlow.common.exception.AccountLockedException;
-import org.springframework.security.authentication.BadCredentialsException;
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -91,7 +93,7 @@ public class GlobalExceptionHandler {
 
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
-    
+
     @ExceptionHandler(AccountLockedException.class)
     public ResponseEntity<Map<String, Object>> handleAccountLockedException(
             AccountLockedException ex,
@@ -121,7 +123,22 @@ public class GlobalExceptionHandler {
 
         return new ResponseEntity<>(body, HttpStatus.UNAUTHORIZED);
     }
-    
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDeniedException(
+            AccessDeniedException ex,
+            HttpServletRequest request) {
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.FORBIDDEN.value());
+        body.put("error", "Forbidden");
+        body.put("message", ex.getMessage());
+        body.put("path", request.getRequestURI());
+
+        return new ResponseEntity<>(body, HttpStatus.FORBIDDEN);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneralException(
             Exception ex,
