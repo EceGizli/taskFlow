@@ -66,13 +66,16 @@ public class ProjectService {
     }
 
     private ProjectResponse convertToResponse(Project project) {
-    	return new ProjectResponse(
-    	        project.getId(),
-    	        project.getName(),
-    	        project.getDescription(),
-    	        project.getStatus(),
-    	        project.getCreatedAt(),
-    	        project.getUpdatedAt()
-    	);
+        return new ProjectResponse(
+                project.getId(),
+                project.getName(),
+                project.getDescription(),
+                project.getStatus(),
+                project.getOwner() != null ? project.getOwner().getId() : null,
+                project.getOwner() != null ? project.getOwner().getName() : null,
+                project.getMembers() != null ? project.getMembers().size() : 0,
+                project.getCreatedAt(),
+                project.getUpdatedAt()
+        );
     }
 }

@@ -4,10 +4,13 @@ import com.beat.taskFlow.project.entity.enums.ProjectStatus;
 import java.time.LocalDateTime;
 
 public record ProjectResponse(
-	    Long id,
-	    String name,
-	    String description,
-	    ProjectStatus status,
-	    LocalDateTime createdAt,
-	    LocalDateTime updatedAt
-	) {}
+        Long id,
+        String name,
+        String description,
+        ProjectStatus status,
+        Long ownerId,
+        String ownerName,
+        int memberCount,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
+) {}
