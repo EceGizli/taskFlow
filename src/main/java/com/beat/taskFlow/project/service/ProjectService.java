@@ -1,6 +1,8 @@
 package com.beat.taskFlow.project.service;
 
+import com.beat.taskFlow.common.exception.AlreadyExistsException;
 import com.beat.taskFlow.common.exception.NotFoundException;
+import com.beat.taskFlow.project.dto.requests.AddMemberRequest;
 import com.beat.taskFlow.project.dto.requests.CreateProjectRequest;
 import com.beat.taskFlow.project.dto.requests.UpdateProjectRequest;
 import com.beat.taskFlow.project.dto.responses.ProjectResponse;
@@ -104,6 +106,69 @@ public class ProjectService {
 
         validateProjectOwner(project, currentUser);
         projectRepository.delete(project);
+    }
+    
+    @Transactional
+    public ProjectResponse addMember(Long projectId,
+                                     AddMemberRequest request,
+                                     Authentication authentication) {
+
+        User currentUser = getCurrentUser(authentication);
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() ->
+                        new NotFoundException("Proje bulunamadı! ID: " + projectId));
+
+        validateProjectOwner(project, currentUser);
+
+        User memberToAdd = userRepository.findById(request.userId())
+                .orElseThrow(() ->
+                        new NotFoundException("Eklenecek kullanıcı bulunamadı! ID: " + request.userId()));
+
+        boolean isAlreadyMember = project.getMembers()
+                .stream()
+                .anyMatch(member -> member.getId().equals(memberToAdd.getId()));
+
+        if (isAlreadyMember) {
+            throw new AlreadyExistsException("Bu kullanıcı zaten projenin üyesidir.");
+        }
+
+        project.getMembers().add(memberToAdd);
+
+        Project updatedProject = projectRepository.save(project);
+
+        return convertToResponse(updatedProject);
+    }
+
+    @Transactional
+    public ProjectResponse removeMember(Long projectId,
+                                        Long userId,
+                                        Authentication authentication) {
+
+        User currentUser = getCurrentUser(authentication);
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() ->
+                        new NotFoundException("Proje bulunamadı! ID: " + projectId));
+
+        validateProjectOwner(project, currentUser);
+
+        if (project.getOwner().getId().equals(userId)) {
+            throw new IllegalArgumentException("Proje sahibi projeden çıkarılamaz.");
+        }
+
+        User memberToRemove = project.getMembers()
+                .stream()
+                .filter(member -> member.getId().equals(userId))
+                .findFirst()
+                .orElseThrow(() ->
+                        new NotFoundException("Kullanıcı bu projenin üyesi değildir."));
+
+        project.getMembers().remove(memberToRemove);
+
+        Project updatedProject = projectRepository.save(project);
+
+        return convertToResponse(updatedProject);
     }
 
     private ProjectResponse convertToResponse(Project project) {

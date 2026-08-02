@@ -9,6 +9,7 @@ import com.beat.taskFlow.task.service.TaskService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,61 +25,69 @@ public class TaskController {
     @ResponseStatus(HttpStatus.CREATED)
     public TaskResponse createTask(
             @PathVariable Long projectId,
-            @Valid @RequestBody CreateTaskRequest request) {
+            @Valid @RequestBody CreateTaskRequest request,
+            Authentication authentication) {
 
-        return taskService.createTask(projectId, request);
+        return taskService.createTask(projectId, request, authentication);
     }
 
     @GetMapping("/projects/{projectId}/tasks")
     public List<TaskResponse> getTasksByProjectId(
-            @PathVariable Long projectId) {
+            @PathVariable Long projectId,
+            Authentication authentication) {
 
-        return taskService.getTasksByProjectId(projectId);
+        return taskService.getTasksByProjectId(projectId, authentication);
     }
 
     @GetMapping("/tasks/{id}")
     public TaskResponse getTaskById(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication) {
 
-        return taskService.getTaskById(id);
+        return taskService.getTaskById(id, authentication);
     }
 
     @PutMapping("/tasks/{id}")
     public TaskResponse updateTask(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateTaskRequest request) {
+            @Valid @RequestBody UpdateTaskRequest request,
+            Authentication authentication) {
 
-        return taskService.updateTask(id, request);
+        return taskService.updateTask(id, request, authentication);
     }
 
     @PatchMapping("/tasks/{id}/status")
     public TaskResponse updateTaskStatus(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateTaskStatusRequest request) {
+            @Valid @RequestBody UpdateTaskStatusRequest request,
+            Authentication authentication) {
 
-        return taskService.updateTaskStatus(id, request);
+        return taskService.updateTaskStatus(id, request, authentication);
     }
 
     @PatchMapping("/tasks/bulk-status")
     public List<TaskResponse> bulkUpdateStatus(
-            @Valid @RequestBody BulkUpdateStatusRequest request) {
-        
-        return taskService.bulkUpdateStatus(request);
+            @Valid @RequestBody BulkUpdateStatusRequest request,
+            Authentication authentication) {
+
+        return taskService.bulkUpdateStatus(request, authentication);
     }
 
     @PostMapping("/tasks/{id}/duplicate")
     @ResponseStatus(HttpStatus.CREATED)
     public TaskResponse duplicateTask(
-            @PathVariable Long id) {
-        
-        return taskService.duplicateTask(id);
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        return taskService.duplicateTask(id, authentication);
     }
 
     @DeleteMapping("/tasks/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteTask(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication) {
 
-        taskService.deleteTask(id);
+        taskService.deleteTask(id, authentication);
     }
 }

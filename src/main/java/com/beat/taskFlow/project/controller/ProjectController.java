@@ -1,5 +1,6 @@
 package com.beat.taskFlow.project.controller;
 
+import com.beat.taskFlow.project.dto.requests.AddMemberRequest;
 import com.beat.taskFlow.project.dto.requests.CreateProjectRequest;
 import com.beat.taskFlow.project.dto.requests.UpdateProjectRequest;
 import com.beat.taskFlow.project.dto.responses.ProjectResponse;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
 
 import java.util.List;
 
@@ -47,5 +49,27 @@ public class ProjectController {
     public ResponseEntity<Void> deleteProject(@PathVariable Long id, Authentication authentication) {
         projectService.deleteProject(id, authentication);
         return ResponseEntity.noContent().build();
+    }
+    
+    @PostMapping("/{id}/members")
+    public ResponseEntity<ProjectResponse> addMember(
+            @PathVariable Long id,
+            @Valid @RequestBody AddMemberRequest request,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(
+                projectService.addMember(id, request, authentication)
+        );
+    }
+
+    @DeleteMapping("/{id}/members/{userId}")
+    public ResponseEntity<ProjectResponse> removeMember(
+            @PathVariable Long id,
+            @PathVariable Long userId,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(
+                projectService.removeMember(id, userId, authentication)
+        );
     }
 }
