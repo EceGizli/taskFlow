@@ -205,9 +205,7 @@ public class TaskService {
     }
     
     @Transactional
-    public TaskResponse assignTask(Long id,
-                                   UpdateTaskAssigneeRequest request,
-                                   Authentication authentication) {
+    public TaskResponse assignTask(Long id, UpdateTaskAssigneeRequest request, Authentication authentication) {
 
         User currentUser = getCurrentUser(authentication);
 
@@ -238,6 +236,17 @@ public class TaskService {
         Task updatedTask = taskRepository.save(task);
 
         return mapToResponse(updatedTask);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<TaskResponse> getAssignedTasks(Authentication authentication) {
+
+        User currentUser = getCurrentUser(authentication);
+
+        return taskRepository.findByAssigneeId(currentUser.getId())
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
     private void validateStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {

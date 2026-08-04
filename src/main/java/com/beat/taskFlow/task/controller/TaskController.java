@@ -48,6 +48,12 @@ public class TaskController {
         return taskService.getTaskById(id, authentication);
     }
 
+    @GetMapping("/tasks/assigned-to-me")
+    public List<TaskResponse> getAssignedTasks(Authentication authentication) {
+
+        return taskService.getAssignedTasks(authentication);
+    }
+    
     @PutMapping("/tasks/{id}")
     public TaskResponse updateTask(
             @PathVariable Long id,
