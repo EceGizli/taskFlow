@@ -4,6 +4,8 @@ import com.beat.taskFlow.project.entity.abstracts.BaseEntity;
 import com.beat.taskFlow.project.entity.concretes.Project;
 import com.beat.taskFlow.task.entity.enums.Priority;
 import com.beat.taskFlow.task.entity.enums.TaskStatus;
+import com.beat.taskFlow.user.entity.concretes.User;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -42,4 +44,8 @@ public class Task extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assignee_id")
+    private User assignee;
 }

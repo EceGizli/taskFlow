@@ -6,6 +6,7 @@ import com.beat.taskFlow.project.entity.concretes.Project;
 import com.beat.taskFlow.project.repository.ProjectRepository;
 import com.beat.taskFlow.task.dto.requests.BulkUpdateStatusRequest;
 import com.beat.taskFlow.task.dto.requests.CreateTaskRequest;
+import com.beat.taskFlow.task.dto.requests.UpdateTaskAssigneeRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskStatusRequest;
 import com.beat.taskFlow.task.dto.responses.TaskResponse;
@@ -202,6 +203,42 @@ public class TaskService {
 
         taskRepository.delete(task);
     }
+    
+    @Transactional
+    public TaskResponse assignTask(Long id,
+                                   UpdateTaskAssigneeRequest request,
+                                   Authentication authentication) {
+
+        User currentUser = getCurrentUser(authentication);
+
+        Task task = taskRepository.findById(id)
+                .orElseThrow(() ->
+                        new NotFoundException("Görev bulunamadı. id = " + id));
+
+        validateTaskAccess(task, currentUser);
+
+        User assignee = userRepository.findById(request.assigneeId())
+                .orElseThrow(() ->
+                        new NotFoundException("Kullanıcı bulunamadı. id = " + request.assigneeId()));
+
+        Project project = task.getProject();
+
+        boolean isProjectMember =
+                project.getOwner().getId().equals(assignee.getId()) ||
+                project.getMembers().stream()
+                        .anyMatch(member -> member.getId().equals(assignee.getId()));
+
+        if (!isProjectMember) {
+            throw new AccessDeniedException(
+                    "Atanacak kullanıcı bu projenin üyesi değildir.");
+        }
+
+        task.setAssignee(assignee);
+
+        Task updatedTask = taskRepository.save(task);
+
+        return mapToResponse(updatedTask);
+    }
 
     private void validateStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {
         if (currentStatus == TaskStatus.DONE && newStatus != TaskStatus.DONE) {
@@ -214,6 +251,7 @@ public class TaskService {
     }
 
     private TaskResponse mapToResponse(Task task) {
+
         return new TaskResponse(
                 task.getId(),
                 task.getTitle(),
@@ -224,7 +262,15 @@ public class TaskService {
                 task.getProject().getId(),
                 task.getEstimatedHours(),
                 task.getCreatedAt(),
-                task.getUpdatedAt()
+                task.getUpdatedAt(),
+
+                task.getAssignee() != null
+                        ? task.getAssignee().getId()
+                        : null,
+
+                task.getAssignee() != null
+                        ? task.getAssignee().getName()
+                        : null
         );
     }
 }

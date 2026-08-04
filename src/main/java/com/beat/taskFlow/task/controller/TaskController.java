@@ -2,6 +2,7 @@ package com.beat.taskFlow.task.controller;
 
 import com.beat.taskFlow.task.dto.requests.BulkUpdateStatusRequest;
 import com.beat.taskFlow.task.dto.requests.CreateTaskRequest;
+import com.beat.taskFlow.task.dto.requests.UpdateTaskAssigneeRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskStatusRequest;
 import com.beat.taskFlow.task.dto.responses.TaskResponse;
@@ -63,6 +64,15 @@ public class TaskController {
             Authentication authentication) {
 
         return taskService.updateTaskStatus(id, request, authentication);
+    }
+    
+    @PatchMapping("/tasks/{id}/assignee")
+    public TaskResponse assignTask(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateTaskAssigneeRequest request,
+            Authentication authentication) {
+
+        return taskService.assignTask(id, request, authentication);
     }
 
     @PatchMapping("/tasks/bulk-status")

@@ -15,5 +15,7 @@ public record TaskResponse(
         Long projectId,
         Integer estimatedHours,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        Long assigneeId,
+        String assigneeName
 ) {}
