@@ -14,7 +14,8 @@ public record CreateTaskRequest(
     String title,
 
     String description,
-
+    @Size(max = 1000)
+    
     @NotNull(message = "Öncelik seçilmelidir")
     Priority priority,
 

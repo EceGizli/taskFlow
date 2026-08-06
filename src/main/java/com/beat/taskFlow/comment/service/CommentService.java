@@ -1,6 +1,7 @@
 package com.beat.taskFlow.comment.service;
 
 import com.beat.taskFlow.comment.dto.requests.CreateCommentRequest;
+import com.beat.taskFlow.comment.dto.requests.UpdateCommentRequest;
 import com.beat.taskFlow.comment.dto.responses.CommentResponse;
 import com.beat.taskFlow.comment.entity.Comment;
 import com.beat.taskFlow.comment.repository.CommentRepository;
@@ -30,9 +31,7 @@ public class CommentService {
 
         String email = authentication.getName();
 
-        return userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new NotFoundException("Kullanıcı bulunamadı: " + email));
+        return userRepository.findByEmail(email).orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı: " + email));
     }
 
     private void validateTaskAccess(Task task, User user) {
@@ -41,25 +40,19 @@ public class CommentService {
 
         boolean isOwner = project.getOwner().getId().equals(user.getId());
 
-        boolean isMember = project.getMembers().stream()
-                .anyMatch(member -> member.getId().equals(user.getId()));
+        boolean isMember = project.getMembers().stream().anyMatch(member -> member.getId().equals(user.getId()));
 
         if (!isOwner && !isMember) {
-            throw new AccessDeniedException(
-                    "Bu göreve erişim yetkiniz bulunmamaktadır.");
+            throw new AccessDeniedException("Bu göreve erişim yetkiniz bulunmamaktadır.");
         }
     }
 
     @Transactional
-    public CommentResponse createComment(Long taskId,
-                                         CreateCommentRequest request,
-                                         Authentication authentication) {
+    public CommentResponse createComment(Long taskId, CreateCommentRequest request, Authentication authentication) {
 
         User currentUser = getCurrentUser(authentication);
 
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() ->
-                        new NotFoundException("Görev bulunamadı. id = " + taskId));
+        Task task = taskRepository.findById(taskId).orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + taskId));
 
         validateTaskAccess(task, currentUser);
 
@@ -75,14 +68,11 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public List<CommentResponse> getCommentsByTask(Long taskId,
-                                                   Authentication authentication) {
+    public List<CommentResponse> getCommentsByTask(Long taskId, Authentication authentication) {
 
         User currentUser = getCurrentUser(authentication);
 
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() ->
-                        new NotFoundException("Görev bulunamadı. id = " + taskId));
+        Task task = taskRepository.findById(taskId).orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + taskId));
 
         validateTaskAccess(task, currentUser);
 
@@ -91,7 +81,51 @@ public class CommentService {
                 .map(this::mapToResponse)
                 .toList();
     }
+    
+    @Transactional
+    public CommentResponse updateComment(Long commentId, UpdateCommentRequest request, Authentication authentication) {
 
+        User currentUser = getCurrentUser(authentication);
+
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() ->
+                        new NotFoundException("Yorum bulunamadı. id = " + commentId));
+
+        boolean isAuthor = comment.getAuthor().getId().equals(currentUser.getId());
+
+        if (!isAuthor) {
+            throw new AccessDeniedException("Sadece yorum sahibi yorumunu güncelleyebilir.");
+        }
+
+        comment.setContent(request.content());
+
+        Comment updatedComment = commentRepository.save(comment);
+
+        return mapToResponse(updatedComment);
+    }
+
+    @Transactional
+    public void deleteComment(Long commentId, Authentication authentication) {
+
+        User currentUser = getCurrentUser(authentication);
+
+        Comment comment = commentRepository.findById(commentId).orElseThrow(() -> new NotFoundException("Yorum bulunamadı. id = " + commentId));
+
+        boolean isAuthor = comment.getAuthor().getId().equals(currentUser.getId());
+
+        boolean isProjectOwner = comment.getTask()
+                .getProject()
+                .getOwner()
+                .getId()
+                .equals(currentUser.getId());
+
+        if (!isAuthor && !isProjectOwner) {
+            throw new AccessDeniedException("Yalnızca yorum sahibi veya proje sahibi bu yorumu silebilir.");
+        }
+
+        commentRepository.delete(comment);
+    }
+    
     private CommentResponse mapToResponse(Comment comment) {
 
         return new CommentResponse(

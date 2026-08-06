@@ -1,6 +1,7 @@
 package com.beat.taskFlow.comment.controller;
 
 import com.beat.taskFlow.comment.dto.requests.CreateCommentRequest;
+import com.beat.taskFlow.comment.dto.requests.UpdateCommentRequest;
 import com.beat.taskFlow.comment.dto.responses.CommentResponse;
 import com.beat.taskFlow.comment.service.CommentService;
 import jakarta.validation.Valid;
@@ -34,5 +35,23 @@ public class CommentController {
             Authentication authentication) {
 
         return commentService.getCommentsByTask(taskId, authentication);
+    }
+    
+    @PutMapping("/comments/{commentId}")
+    public CommentResponse updateComment(
+            @PathVariable Long commentId,
+            @Valid @RequestBody UpdateCommentRequest request,
+            Authentication authentication) {
+
+        return commentService.updateComment(commentId, request, authentication);
+    }
+    
+    @DeleteMapping("/comments/{commentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteComment(
+            @PathVariable Long commentId,
+            Authentication authentication) {
+
+        commentService.deleteComment(commentId, authentication);
     }
 }
