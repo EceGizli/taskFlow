@@ -2,7 +2,9 @@ package com.beat.taskFlow.common;
 
 import com.beat.taskFlow.common.exception.AccountLockedException;
 import com.beat.taskFlow.common.exception.AlreadyExistsException;
+import com.beat.taskFlow.common.exception.EmailSendingException;
 import com.beat.taskFlow.common.exception.InvalidTaskStatusException;
+import com.beat.taskFlow.common.exception.InvalidTokenException;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -149,6 +151,36 @@ public class GlobalExceptionHandler {
         body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
         body.put("error", "Internal Server Error");
         body.put("message", "Sistemsel bir hata oluştu: " + ex.getMessage());
+        body.put("path", request.getRequestURI());
+
+        return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidTokenException(
+            InvalidTokenException ex,
+            HttpServletRequest request) {
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", "Bad Request");
+        body.put("message", ex.getMessage());
+        body.put("path", request.getRequestURI());
+
+        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(EmailSendingException.class)
+    public ResponseEntity<Map<String, Object>> handleEmailSendingException(
+            EmailSendingException ex,
+            HttpServletRequest request) {
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        body.put("error", "Internal Server Error");
+        body.put("message", "E-posta gönderilirken bir hata oluştu.");
         body.put("path", request.getRequestURI());
 
         return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
