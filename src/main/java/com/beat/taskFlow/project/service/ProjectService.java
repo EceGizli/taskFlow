@@ -154,8 +154,8 @@ public class ProjectService {
         validateProjectOwner(project, currentUser);
 
         if (project.getOwner().getId().equals(userId)) {
-            throw new IllegalArgumentException("Proje sahibi projeden çıkarılamaz.");
-        }
+        	throw new AccessDeniedException("Proje sahibi projeden çıkarılamaz.");      
+        	}
 
         User memberToRemove = project.getMembers()
                 .stream()

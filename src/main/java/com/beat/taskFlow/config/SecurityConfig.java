@@ -1,6 +1,8 @@
 package com.beat.taskFlow.config;
 
 import com.beat.taskFlow.user.service.CustomUserDetailsService;
+
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,26 +29,38 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        http
-                .csrf(csrf -> csrf.disable())
+    	http
+        .csrf(csrf -> csrf.disable())
 
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/api/auth/**",
-                                "/api/ping"
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                )
+        .exceptionHandling(exception -> exception
+                .authenticationEntryPoint((request, response, authException) ->
+                        response.sendError(
+                                HttpServletResponse.SC_UNAUTHORIZED,
+                                "Unauthorized"
+                        ))
+        )
 
-                .authenticationProvider(authenticationProvider())
+        .authorizeHttpRequests(auth -> auth
+                .requestMatchers(
+                        "/api/auth/register",
+                        "/api/auth/login",
+                        "/api/auth/forgot-password",
+                        "/api/auth/reset-password",
+                        "/api/ping"
+                ).permitAll()
+                .anyRequest().authenticated()
+        )
 
-                .addFilterBefore(jwtAuthFilter,
-                        UsernamePasswordAuthenticationFilter.class)
+        .authenticationProvider(authenticationProvider())
 
-                .httpBasic(Customizer.withDefaults());
+        .addFilterBefore(
+                jwtAuthFilter,
+                UsernamePasswordAuthenticationFilter.class
+        );
+
 
         return http.build();
     }
