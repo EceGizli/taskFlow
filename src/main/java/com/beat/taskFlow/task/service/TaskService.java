@@ -11,16 +11,22 @@ import com.beat.taskFlow.task.dto.requests.UpdateTaskRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskStatusRequest;
 import com.beat.taskFlow.task.dto.responses.TaskResponse;
 import com.beat.taskFlow.task.entity.concretes.Task;
+import com.beat.taskFlow.task.entity.enums.Priority;
 import com.beat.taskFlow.task.entity.enums.TaskStatus;
 import com.beat.taskFlow.task.repository.TaskRepository;
 import com.beat.taskFlow.user.entity.concretes.User;
 import com.beat.taskFlow.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -79,25 +85,96 @@ public class TaskService {
     }
 
     @Transactional(readOnly = true)
-    public List<TaskResponse> getTasksByProjectId(Long projectId, Authentication authentication) {
+    public Page<TaskResponse> getTasksByProjectId(            
+    			Long projectId,
+            TaskStatus status,
+            Priority priority,
+            Long assigneeId,
+            LocalDate startDate,
+            LocalDate endDate,
+            Pageable pageable,
+            Authentication authentication) {
+
         User currentUser = getCurrentUser(authentication);
 
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new NotFoundException("Proje bulunamadı. id = " + projectId));
+                .orElseThrow(() ->
+                        new NotFoundException(
+                                "Proje bulunamadı. id = " + projectId
+                        ));
 
-        boolean hasAccess = project.getOwner().getId().equals(currentUser.getId()) ||
+        boolean hasAccess =
+                project.getOwner().getId().equals(currentUser.getId()) ||
                 project.getMembers().stream()
-                        .anyMatch(member -> member.getId().equals(currentUser.getId()));
+                        .anyMatch(member ->
+                                member.getId().equals(currentUser.getId()));
 
         if (!hasAccess) {
-            throw new AccessDeniedException("Bu projeye erişim yetkiniz bulunmamaktadır.");
+            throw new AccessDeniedException(
+                    "Bu projeye erişim yetkiniz bulunmamaktadır."
+            );
         }
 
-        return taskRepository.findByProjectId(projectId)
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
-    }
+        if (startDate != null
+                && endDate != null
+                && startDate.isAfter(endDate)) {
+
+            throw new IllegalArgumentException(
+                    "Başlangıç tarihi bitiş tarihinden sonra olamaz."
+            );
+        }
+
+
+        Specification<Task> specification =
+                (root, query, cb) ->
+                        cb.equal(root.get("project").get("id"), projectId);
+
+        if (status != null) {
+            specification = specification.and(
+                    (root, query, cb) ->
+                            cb.equal(root.get("status"), status)
+            );
+        }
+
+        if (priority != null) {
+            specification = specification.and(
+                    (root, query, cb) ->
+                            cb.equal(root.get("priority"), priority)
+            );
+        }
+
+        if (assigneeId != null) {
+            specification = specification.and(
+                    (root, query, cb) ->
+                            cb.equal(root.get("assignee").get("id"), assigneeId)
+            );
+        }
+
+        if (startDate != null) {
+            specification = specification.and(
+                    (root, query, cb) ->
+                            cb.greaterThanOrEqualTo(
+                                    root.get("dueDate"),
+                                    startDate
+                            )
+            );
+        }
+
+        if (endDate != null) {
+            specification = specification.and(
+                    (root, query, cb) ->
+                            cb.lessThanOrEqualTo(
+                                    root.get("dueDate"),
+                                    endDate
+                            )
+            );
+        }
+
+        Page<Task> taskPage =
+                taskRepository.findAll(specification, pageable);
+
+        return taskPage.map(this::mapToResponse);
+     }
 
     @Transactional(readOnly = true)
     public TaskResponse getTaskById(Long id, Authentication authentication) {

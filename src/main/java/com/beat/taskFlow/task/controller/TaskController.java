@@ -6,13 +6,19 @@ import com.beat.taskFlow.task.dto.requests.UpdateTaskAssigneeRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskStatusRequest;
 import com.beat.taskFlow.task.dto.responses.TaskResponse;
+import com.beat.taskFlow.task.entity.enums.Priority;
+import com.beat.taskFlow.task.entity.enums.TaskStatus;
 import com.beat.taskFlow.task.service.TaskService;
 import jakarta.validation.Valid;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -33,11 +39,26 @@ public class TaskController {
     }
 
     @GetMapping("/projects/{projectId}/tasks")
-    public List<TaskResponse> getTasksByProjectId(
-            @PathVariable Long projectId,
+    public Page<TaskResponse> getTasksByProjectId(            
+    			@PathVariable Long projectId,
+            @RequestParam(required = false) TaskStatus status,
+            @RequestParam(required = false) Priority priority,
+            @RequestParam(required = false) Long assigneeId,
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate,
+            Pageable pageable,
             Authentication authentication) {
 
-        return taskService.getTasksByProjectId(projectId, authentication);
+        return taskService.getTasksByProjectId(
+                projectId,
+                status,
+                priority,
+                assigneeId,
+                startDate,
+                endDate,
+                pageable,
+                authentication
+        );
     }
 
     @GetMapping("/tasks/{id}")
