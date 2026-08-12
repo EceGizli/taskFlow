@@ -4,7 +4,10 @@ import com.beat.taskFlow.project.dto.requests.AddMemberRequest;
 import com.beat.taskFlow.project.dto.requests.CreateProjectRequest;
 import com.beat.taskFlow.project.dto.requests.UpdateProjectRequest;
 import com.beat.taskFlow.project.dto.responses.ProjectResponse;
+import com.beat.taskFlow.project.dto.responses.ProjectStatsResponse;
 import com.beat.taskFlow.project.service.ProjectService;
+import com.beat.taskFlow.task.service.TaskService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +24,7 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final TaskService taskService;
 
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> getAllProjects(Authentication authentication) {
@@ -70,6 +74,16 @@ public class ProjectController {
 
         return ResponseEntity.ok(
                 projectService.removeMember(id, userId, authentication)
+        );
+    }
+    
+    @GetMapping("/{id}/stats")
+    public ResponseEntity<ProjectStatsResponse> getProjectStats(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(
+                taskService.getProjectStats(id, authentication)
         );
     }
 }

@@ -2,6 +2,7 @@ package com.beat.taskFlow.task.service;
 
 import com.beat.taskFlow.common.exception.InvalidTaskStatusException;
 import com.beat.taskFlow.common.exception.NotFoundException;
+import com.beat.taskFlow.project.dto.responses.ProjectStatsResponse;
 import com.beat.taskFlow.project.entity.concretes.Project;
 import com.beat.taskFlow.project.repository.ProjectRepository;
 import com.beat.taskFlow.task.dto.requests.BulkUpdateStatusRequest;
@@ -324,6 +325,55 @@ public class TaskService {
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
+    }
+    
+    @Transactional(readOnly = true)
+    public ProjectStatsResponse getProjectStats(
+            Long projectId,
+            Authentication authentication) {
+
+        User currentUser = getCurrentUser(authentication);
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() ->
+                        new NotFoundException(
+                                "Proje bulunamadı. id = " + projectId
+                        ));
+
+        boolean hasAccess =
+                project.getOwner().getId().equals(currentUser.getId()) ||
+                project.getMembers().stream()
+                        .anyMatch(member ->
+                                member.getId().equals(currentUser.getId()));
+
+        if (!hasAccess) {
+            throw new AccessDeniedException(
+                    "Bu projeye erişim yetkiniz bulunmamaktadır."
+            );
+        }
+
+        List<Task> tasks = taskRepository.findByProjectId(projectId);
+
+        long totalTasks = tasks.size();
+
+        long todo = tasks.stream()
+                .filter(task -> task.getStatus() == TaskStatus.TODO)
+                .count();
+
+        long inProgress = tasks.stream()
+                .filter(task -> task.getStatus() == TaskStatus.IN_PROGRESS)
+                .count();
+
+        long done = tasks.stream()
+                .filter(task -> task.getStatus() == TaskStatus.DONE)
+                .count();
+
+        return new ProjectStatsResponse(
+                totalTasks,
+                todo,
+                inProgress,
+                done
+        );
     }
 
     private void validateStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {
