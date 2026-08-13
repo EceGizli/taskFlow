@@ -86,8 +86,9 @@ public class TaskService {
     }
 
     @Transactional(readOnly = true)
-    public Page<TaskResponse> getTasksByProjectId(            
-    			Long projectId,
+    public Page<TaskResponse> getTasksByProjectId(
+            Long projectId,
+            String search,
             TaskStatus status,
             Priority priority,
             Long assigneeId,
@@ -127,9 +128,17 @@ public class TaskService {
 
 
         Specification<Task> specification =
-                (root, query, cb) ->
-                        cb.equal(root.get("project").get("id"), projectId);
+        		(root, query, cb) -> cb.equal(root.get("project").get("id"), projectId);
 
+        			if (search != null && !search.trim().isEmpty()) {
+
+        				String searchPattern = "%" + search.trim().toLowerCase() + "%";
+
+        					specification = specification.and( (root, query, cb) ->
+        						cb.or( cb.like( cb.lower(root.get("title")), searchPattern ),
+		 						cb.like(cb.lower(root.get("description")), searchPattern)));
+                        }                        
+                 
         if (status != null) {
             specification = specification.and(
                     (root, query, cb) ->
@@ -376,6 +385,47 @@ public class TaskService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public List<TaskResponse> getOverdueTasks(
+            Long projectId,
+            Authentication authentication) {
+
+        User currentUser = getCurrentUser(authentication);
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() ->
+                        new NotFoundException(
+                                "Proje bulunamadı. id = " + projectId
+                        ));
+
+        boolean hasAccess =
+                project.getOwner().getId().equals(currentUser.getId()) ||
+                project.getMembers().stream()
+                        .anyMatch(member ->
+                                member.getId().equals(currentUser.getId()));
+
+        if (!hasAccess) {
+            throw new AccessDeniedException(
+                    "Bu projeye erişim yetkiniz bulunmamaktadır."
+            );
+        }
+
+        LocalDate today = LocalDate.now();
+
+        List<Task> overdueTasks = taskRepository.findByProjectId(projectId)
+                .stream()
+                .filter(task ->
+                        task.getDueDate() != null &&
+                        task.getDueDate().isBefore(today) &&
+                        task.getStatus() != TaskStatus.DONE
+                )
+                .toList();
+
+        return overdueTasks.stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+    
     private void validateStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {
         if (currentStatus == TaskStatus.DONE && newStatus != TaskStatus.DONE) {
             throw new InvalidTaskStatusException("Tamamlanan görev tekrar başka bir duruma geçirilemez.");

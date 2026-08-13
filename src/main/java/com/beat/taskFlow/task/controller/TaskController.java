@@ -40,7 +40,8 @@ public class TaskController {
 
     @GetMapping("/projects/{projectId}/tasks")
     public Page<TaskResponse> getTasksByProjectId(            
-    			@PathVariable Long projectId,
+            @PathVariable Long projectId,
+            @RequestParam(required = false) String search,
             @RequestParam(required = false) TaskStatus status,
             @RequestParam(required = false) Priority priority,
             @RequestParam(required = false) Long assigneeId,
@@ -49,16 +50,17 @@ public class TaskController {
             Pageable pageable,
             Authentication authentication) {
 
-        return taskService.getTasksByProjectId(
-                projectId,
-                status,
-                priority,
-                assigneeId,
-                startDate,
-                endDate,
-                pageable,
-                authentication
-        );
+    	return taskService.getTasksByProjectId(
+    	        projectId,
+    	        search,
+    	        status,
+    	        priority,
+    	        assigneeId,
+    	        startDate,
+    	        endDate,
+    	        pageable,
+    	        authentication
+    	);
     }
 
     @GetMapping("/tasks/{id}")
@@ -73,6 +75,14 @@ public class TaskController {
     public List<TaskResponse> getAssignedTasks(Authentication authentication) {
 
         return taskService.getAssignedTasks(authentication);
+    }
+    
+    @GetMapping("/projects/{projectId}/tasks/overdue")
+    public List<TaskResponse> getOverdueTasks(
+            @PathVariable Long projectId,
+            Authentication authentication) {
+
+        return taskService.getOverdueTasks(projectId, authentication);
     }
     
     @PutMapping("/tasks/{id}")
