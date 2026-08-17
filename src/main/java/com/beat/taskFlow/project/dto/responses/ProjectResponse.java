@@ -7,6 +7,8 @@ public record ProjectResponse(
         Long id,
         String name,
         String description,
+        String color,
+        String tag,
         ProjectStatus status,
         Long ownerId,
         String ownerName,

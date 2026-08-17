@@ -2,6 +2,7 @@ package com.beat.taskFlow.project.controller;
 
 import com.beat.taskFlow.project.dto.requests.AddMemberRequest;
 import com.beat.taskFlow.project.dto.requests.CreateProjectRequest;
+import com.beat.taskFlow.project.dto.requests.TransferOwnershipRequest;
 import com.beat.taskFlow.project.dto.requests.UpdateProjectRequest;
 import com.beat.taskFlow.project.dto.responses.ProjectResponse;
 import com.beat.taskFlow.project.dto.responses.ProjectStatsResponse;
@@ -27,8 +28,14 @@ public class ProjectController {
     private final TaskService taskService;
 
     @GetMapping
-    public ResponseEntity<List<ProjectResponse>> getAllProjects(Authentication authentication) {
-        return ResponseEntity.ok(projectService.getAllProjects(authentication));
+    public ResponseEntity<List<ProjectResponse>> getAllProjects(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String sort,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(
+                projectService.getAllProjects(authentication, search, sort)
+        );
     }
 
     @GetMapping("/{id}")
@@ -43,9 +50,7 @@ public class ProjectController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ProjectResponse> updateProject(@PathVariable Long id,
-                                                         @Valid @RequestBody UpdateProjectRequest request,
-                                                         Authentication authentication) {
+    public ResponseEntity<ProjectResponse> updateProject(@PathVariable Long id, @Valid @RequestBody UpdateProjectRequest request, Authentication authentication) {
         return ResponseEntity.ok(projectService.updateProject(id, request, authentication));
     }
 
@@ -85,5 +90,21 @@ public class ProjectController {
         return ResponseEntity.ok(
                 taskService.getProjectStats(id, authentication)
         );
+    }
+    
+    @DeleteMapping("/{id}/members/leave")
+    public ResponseEntity<Void> leaveProject(
+            @PathVariable Long id,
+            Authentication authentication) {
+        projectService.leaveProject(id, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/transfer-ownership")
+    public ResponseEntity<ProjectResponse> transferOwnership(
+            @PathVariable Long id,
+            @Valid @RequestBody TransferOwnershipRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(projectService.transferOwnership(id, request, authentication.getName()));
     }
 }

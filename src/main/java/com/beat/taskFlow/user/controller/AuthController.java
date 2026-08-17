@@ -2,10 +2,12 @@ package com.beat.taskFlow.user.controller;
 
 import com.beat.taskFlow.user.dto.requests.ForgotPasswordRequest;
 import com.beat.taskFlow.user.dto.requests.LoginRequest;
+import com.beat.taskFlow.user.dto.requests.RefreshTokenRequest;
 import com.beat.taskFlow.user.dto.requests.RegisterRequest;
 import com.beat.taskFlow.user.dto.requests.ResetPasswordRequest;
 import com.beat.taskFlow.user.dto.responses.LoginResponse;
 import com.beat.taskFlow.user.dto.responses.MeResponse;
+import com.beat.taskFlow.user.dto.responses.RefreshTokenResponse;
 import com.beat.taskFlow.user.dto.responses.RegisterResponse;
 import com.beat.taskFlow.user.service.PasswordResetService;
 import com.beat.taskFlow.user.service.UserService;
@@ -39,10 +41,16 @@ public class AuthController {
         return userService.login(request);
     }
 
-    @GetMapping("/me")
-    public MeResponse me(Authentication authentication) {
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshTokenResponse> refreshToken(
+            @Valid @RequestBody RefreshTokenRequest request) {
 
-        return userService.me(authentication);
+        return ResponseEntity.ok(userService.refreshToken(request));
+    }    
+    
+    @GetMapping("/me")
+    public ResponseEntity<MeResponse> getMe(Authentication authentication) {
+        return ResponseEntity.ok(userService.getCurrentUser(authentication.getName()));
     }
     
     @PostMapping("/forgot-password")

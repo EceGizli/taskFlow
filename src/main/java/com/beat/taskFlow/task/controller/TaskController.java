@@ -6,6 +6,7 @@ import com.beat.taskFlow.task.dto.requests.UpdateTaskAssigneeRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateTaskStatusRequest;
 import com.beat.taskFlow.task.dto.responses.TaskResponse;
+import com.beat.taskFlow.task.dto.responses.TaskStatusHistoryResponse;
 import com.beat.taskFlow.task.entity.enums.Priority;
 import com.beat.taskFlow.task.entity.enums.TaskStatus;
 import com.beat.taskFlow.task.service.TaskService;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -71,6 +73,26 @@ public class TaskController {
         return taskService.getTaskById(id, authentication);
     }
 
+    @GetMapping("/tasks/{taskId}/subtasks")
+    public ResponseEntity<List<TaskResponse>> getSubTasks(
+            @PathVariable Long taskId,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(
+                taskService.getSubTasks(taskId, authentication)
+        );
+    }
+    
+    @GetMapping("/tasks/{taskId}/history")
+    public ResponseEntity<List<TaskStatusHistoryResponse>> getTaskStatusHistory(
+            @PathVariable Long taskId,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(
+                taskService.getTaskStatusHistory(taskId, authentication)
+        );
+    }
+    
     @GetMapping("/tasks/assigned-to-me")
     public List<TaskResponse> getAssignedTasks(Authentication authentication) {
 

@@ -20,6 +20,8 @@ public interface TaskRepository
     List<Task> findByProjectId(Long projectId);
 
     List<Task> findByAssigneeId(Long assigneeId);
+    
+    List<Task> findByParentTaskId(Long parentTaskId);
 
     List<Task> findByProjectIdAndStatus(
             Long projectId,

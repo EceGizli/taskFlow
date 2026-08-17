@@ -4,6 +4,7 @@ import com.beat.taskFlow.common.exception.AlreadyExistsException;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.project.dto.requests.AddMemberRequest;
 import com.beat.taskFlow.project.dto.requests.CreateProjectRequest;
+import com.beat.taskFlow.project.dto.requests.TransferOwnershipRequest;
 import com.beat.taskFlow.project.dto.requests.UpdateProjectRequest;
 import com.beat.taskFlow.project.dto.responses.ProjectResponse;
 import com.beat.taskFlow.project.entity.concretes.Project;
@@ -16,6 +17,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -29,14 +33,12 @@ public class ProjectService {
 
     private User getCurrentUser(Authentication authentication) {
         String email = authentication.getName();
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı: " + email));
+        return userRepository.findByEmail(email).orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı: " + email));
     }
 
     private void validateProjectAccess(Project project, User user) {
         boolean isOwner = project.getOwner().getId().equals(user.getId());
-        boolean isMember = project.getMembers().stream()
-                .anyMatch(member -> member.getId().equals(user.getId()));
+        boolean isMember = project.getMembers().stream().anyMatch(member -> member.getId().equals(user.getId()));
 
         if (!isOwner && !isMember) {
             throw new AccessDeniedException("Bu projeye erişim yetkiniz bulunmamaktadır!");
@@ -50,9 +52,24 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProjectResponse> getAllProjects(Authentication authentication) {
+    public List<ProjectResponse> getAllProjects(Authentication authentication, String search, String sort) {
         User currentUser = getCurrentUser(authentication);
-        return projectRepository.findAccessibleProjects(currentUser.getId()).stream()
+
+        Sort sorting = Sort.by(Sort.Direction.ASC, "createdAt");
+
+        if ("createdAt,desc".equalsIgnoreCase(sort)) {
+            sorting = Sort.by(Sort.Direction.DESC, "createdAt");
+        }
+
+        Pageable pageable = PageRequest.of(0, Integer.MAX_VALUE, sorting);
+
+        String searchValue = (search == null || search.isBlank()) ? "" : search;
+
+        return projectRepository.findAccessibleProjects(
+                currentUser.getId(),
+                searchValue,
+                pageable
+        ).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -74,6 +91,8 @@ public class ProjectService {
         Project project = new Project();
         project.setName(request.name());
         project.setDescription(request.description());
+        project.setColor(request.color());
+        project.setTag(request.tag());
         project.setStatus(ProjectStatus.ACTIVE);
         project.setOwner(currentUser);
         project.getMembers().add(currentUser);
@@ -92,6 +111,8 @@ public class ProjectService {
 
         project.setName(request.name());
         project.setDescription(request.description());
+        project.setColor(request.color());
+        project.setTag(request.tag());
         project.setStatus(request.status());
 
         Project updatedProject = projectRepository.save(project);
@@ -109,9 +130,7 @@ public class ProjectService {
     }
     
     @Transactional
-    public ProjectResponse addMember(Long projectId,
-                                     AddMemberRequest request,
-                                     Authentication authentication) {
+    public ProjectResponse addMember(Long projectId, AddMemberRequest request, Authentication authentication) {
 
         User currentUser = getCurrentUser(authentication);
 
@@ -141,9 +160,7 @@ public class ProjectService {
     }
 
     @Transactional
-    public ProjectResponse removeMember(Long projectId,
-                                        Long userId,
-                                        Authentication authentication) {
+    public ProjectResponse removeMember(Long projectId, Long userId, Authentication authentication) {
 
         User currentUser = getCurrentUser(authentication);
 
@@ -170,12 +187,60 @@ public class ProjectService {
 
         return convertToResponse(updatedProject);
     }
+    
+    @Transactional
+    public void leaveProject(Long projectId, String currentUserEmail) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Proje bulunamadı: id=" + projectId));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı"));
+
+        if (project.getOwner().getId().equals(currentUser.getId())) {
+            throw new IllegalArgumentException("Proje sahibi projeden ayrılamaz. Önce sahipliği devretmelisiniz.");
+        }
+
+        if (!project.getMembers().contains(currentUser)) {
+            throw new NotFoundException("Bu projede üye değilsiniz.");
+        }
+
+        project.getMembers().remove(currentUser);
+        projectRepository.save(project);
+    }
+
+    @Transactional
+    public ProjectResponse transferOwnership(Long projectId, TransferOwnershipRequest req, String currentUserEmail) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Proje bulunamadı: id=" + projectId));
+
+        User currentOwner = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı"));
+
+        if (!project.getOwner().getId().equals(currentOwner.getId())) {
+            throw new AccessDeniedException("Yalnızca proje sahibi sahipliği devredebilir.");
+        }
+
+        User newOwner = userRepository.findById(req.newOwnerId())
+                .orElseThrow(() -> new NotFoundException("Yeni sahip kullanıcı bulunamadı: id=" + req.newOwnerId()));
+
+        if (newOwner.getId().equals(currentOwner.getId())) {
+            throw new IllegalArgumentException("Zaten bu projenin sahibisiniz.");
+        }
+
+        project.getMembers().add(newOwner);
+        project.setOwner(newOwner);
+
+        Project updatedProject = projectRepository.save(project);
+        return convertToResponse(updatedProject);
+    }
 
     private ProjectResponse convertToResponse(Project project) {
         return new ProjectResponse(
                 project.getId(),
                 project.getName(),
                 project.getDescription(),
+                project.getColor(),
+                project.getTag(),
                 project.getStatus(),
                 project.getOwner().getId(),
                 project.getOwner().getName(),

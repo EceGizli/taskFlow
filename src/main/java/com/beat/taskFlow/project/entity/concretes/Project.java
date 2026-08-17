@@ -23,7 +23,13 @@ public class Project extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+    
+    @Column(length = 20)
+    private String color;
 
+    @Column(length = 50)
+    private String tag;
+    
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ProjectStatus status;

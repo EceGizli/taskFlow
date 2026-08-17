@@ -17,5 +17,6 @@ public record TaskResponse(
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         Long assigneeId,
-        String assigneeName
+        String assigneeName,
+        Long parentTaskId
 ) {}
