@@ -15,5 +15,4 @@ public record CommentResponse(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 
-) {
-}
+) {}
