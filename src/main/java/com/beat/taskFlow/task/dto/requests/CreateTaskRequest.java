@@ -1,29 +1,19 @@
 package com.beat.taskFlow.task.dto.requests;
 
 import com.beat.taskFlow.task.entity.enums.Priority;
+import com.beat.taskFlow.task.entity.enums.TaskStatus;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
 public record CreateTaskRequest(
-        @NotBlank(message = "Görev başlığı boş bırakılamaz")
-        @Size(max = 200, message = "Görev başlığı en fazla 200 karakter olabilir")
-        String title,
-
+        @NotBlank @Size(max = 200) String title,
         String description,
-
-        @NotNull(message = "Öncelik seçilmelidir")
+        TaskStatus status,
         Priority priority,
-
         LocalDate dueDate,
-
-        @PositiveOrZero(message = "Tahmini süre negatif olamaz")
         Integer estimatedHours,
-
-        @Positive(message = "Ana görev ID'si pozitif olmalıdır")
+        Long assigneeId,
         Long parentTaskId
 ) {}

@@ -13,13 +13,13 @@ import com.beat.taskFlow.project.repository.ProjectRepository;
 import com.beat.taskFlow.user.entity.concretes.User;
 import com.beat.taskFlow.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -52,7 +52,7 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProjectResponse> getAllProjects(Authentication authentication, String search, String sort) {
+    public List<ProjectResponse> getAllProjects(Authentication authentication, ProjectStatus status, String search, String sort) {
         User currentUser = getCurrentUser(authentication);
 
         Sort sorting = Sort.by(Sort.Direction.ASC, "createdAt");
@@ -67,6 +67,7 @@ public class ProjectService {
 
         return projectRepository.findAccessibleProjects(
                 currentUser.getId(),
+                status,
                 searchValue,
                 pageable
         ).stream()
@@ -131,7 +132,6 @@ public class ProjectService {
     
     @Transactional
     public ProjectResponse addMember(Long projectId, AddMemberRequest request, Authentication authentication) {
-
         User currentUser = getCurrentUser(authentication);
 
         Project project = projectRepository.findById(projectId)
@@ -161,7 +161,6 @@ public class ProjectService {
 
     @Transactional
     public ProjectResponse removeMember(Long projectId, Long userId, Authentication authentication) {
-
         User currentUser = getCurrentUser(authentication);
 
         Project project = projectRepository.findById(projectId)
@@ -171,8 +170,8 @@ public class ProjectService {
         validateProjectOwner(project, currentUser);
 
         if (project.getOwner().getId().equals(userId)) {
-        	throw new AccessDeniedException("Proje sahibi projeden çıkarılamaz.");      
-        	}
+            throw new AccessDeniedException("Proje sahibi projeden çıkarılamaz.");     
+        }
 
         User memberToRemove = project.getMembers()
                 .stream()

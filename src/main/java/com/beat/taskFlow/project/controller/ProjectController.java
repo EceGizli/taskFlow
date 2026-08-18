@@ -6,6 +6,7 @@ import com.beat.taskFlow.project.dto.requests.TransferOwnershipRequest;
 import com.beat.taskFlow.project.dto.requests.UpdateProjectRequest;
 import com.beat.taskFlow.project.dto.responses.ProjectResponse;
 import com.beat.taskFlow.project.dto.responses.ProjectStatsResponse;
+import com.beat.taskFlow.project.entity.enums.ProjectStatus;
 import com.beat.taskFlow.project.service.ProjectService;
 import com.beat.taskFlow.task.service.TaskService;
 
@@ -15,7 +16,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
 
 import java.util.List;
 
@@ -29,13 +29,12 @@ public class ProjectController {
 
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> getAllProjects(
+            @RequestParam(required = false) ProjectStatus status,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String sort,
             Authentication authentication) {
 
-        return ResponseEntity.ok(
-                projectService.getAllProjects(authentication, search, sort)
-        );
+        return ResponseEntity.ok( projectService.getAllProjects(authentication, status, search, sort) );
     }
 
     @GetMapping("/{id}")

@@ -1,16 +1,17 @@
 package com.beat.taskFlow.task.service;
 
+import com.beat.taskFlow.common.exception.AlreadyExistsException;
 import com.beat.taskFlow.common.exception.InvalidTaskStatusException;
 import com.beat.taskFlow.common.exception.NotFoundException;
+import com.beat.taskFlow.label.dto.responses.LabelResponse;
+import com.beat.taskFlow.label.entity.Label;
+import com.beat.taskFlow.label.repository.LabelRepository;
 import com.beat.taskFlow.project.dto.responses.ProjectStatsResponse;
 import com.beat.taskFlow.project.entity.concretes.Project;
 import com.beat.taskFlow.project.repository.ProjectRepository;
-import com.beat.taskFlow.task.dto.requests.BulkUpdateStatusRequest;
-import com.beat.taskFlow.task.dto.requests.CreateTaskRequest;
-import com.beat.taskFlow.task.dto.requests.UpdateTaskAssigneeRequest;
-import com.beat.taskFlow.task.dto.requests.UpdateTaskRequest;
-import com.beat.taskFlow.task.dto.requests.UpdateTaskStatusRequest;
+import com.beat.taskFlow.task.dto.requests.*;
 import com.beat.taskFlow.task.dto.responses.TaskResponse;
+import com.beat.taskFlow.task.dto.responses.TaskStatusHistoryResponse;
 import com.beat.taskFlow.task.entity.concretes.Task;
 import com.beat.taskFlow.task.entity.concretes.TaskStatusHistory;
 import com.beat.taskFlow.task.entity.enums.Priority;
@@ -19,8 +20,9 @@ import com.beat.taskFlow.task.repository.TaskRepository;
 import com.beat.taskFlow.task.repository.TaskStatusHistoryRepository;
 import com.beat.taskFlow.user.entity.concretes.User;
 import com.beat.taskFlow.user.repository.UserRepository;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
-import com.beat.taskFlow.task.dto.responses.TaskStatusHistoryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -32,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +45,7 @@ public class TaskService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final TaskStatusHistoryRepository taskStatusHistoryRepository;
+    private final LabelRepository labelRepository;
 
     private User getCurrentUser(Authentication authentication) {
         String email = authentication.getName();
@@ -48,60 +53,71 @@ public class TaskService {
                 .orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı: " + email));
     }
 
-    private void validateTaskAccess(Task task, User user) {
-        Project project = task.getProject();
-
+    private void validateProjectAccess(Project project, User user) {
         boolean isOwner = project.getOwner().getId().equals(user.getId());
-        boolean isMember = project.getMembers().stream()
-                .anyMatch(member -> member.getId().equals(user.getId()));
+        boolean isMember = project.getMembers().stream().anyMatch(m -> m.getId().equals(user.getId()));
 
         if (!isOwner && !isMember) {
-            throw new AccessDeniedException("Bu göreve erişim yetkiniz bulunmamaktadır.");
+            throw new AccessDeniedException("Bu projeye erişim yetkiniz bulunmamaktadır!");
+        }
+    }
+
+    private void validateTaskAccess(Task task, User user) {
+        validateProjectAccess(task.getProject(), user);
+    }
+
+    private void validateStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {
+        if (currentStatus == TaskStatus.DONE && newStatus == TaskStatus.TODO) {
+            throw new InvalidTaskStatusException("Tamamlanmış bir görev (DONE) doğrudan TODO durumuna çekilemez!");
         }
     }
 
     @Transactional
     public TaskResponse createTask(Long projectId, CreateTaskRequest request, Authentication authentication) {
-
         User currentUser = getCurrentUser(authentication);
-
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() ->
-                        new NotFoundException("Proje bulunamadı. id = " + projectId));
+                .orElseThrow(() -> new NotFoundException("Proje bulunamadı! ID: " + projectId));
 
-        boolean hasAccess =
-                project.getOwner().getId().equals(currentUser.getId()) ||
-                project.getMembers().stream()
-                        .anyMatch(member -> member.getId().equals(currentUser.getId()));
+        validateProjectAccess(project, currentUser);
 
-        if (!hasAccess) {
-            throw new AccessDeniedException("Bu projeye görev ekleme yetkiniz bulunmamaktadır."
-            );
+        User assignee = null;
+        if (request.assigneeId() != null) {
+            assignee = userRepository.findById(request.assigneeId())
+                    .orElseThrow(() -> new NotFoundException("Atanan kullanıcı bulunamadı! ID: " + request.assigneeId()));
+
+            boolean isAssigneeMember = project.getMembers().stream()
+                    .anyMatch(m -> m.getId().equals(request.assigneeId())) || project.getOwner().getId().equals(request.assigneeId());
+
+            if (!isAssigneeMember) {
+                throw new AccessDeniedException("Yalnızca proje üyelerine görev atanabilir!");
+            }
         }
 
         Task parentTask = null;
-
         if (request.parentTaskId() != null) {
             parentTask = taskRepository.findById(request.parentTaskId())
-                    .orElseThrow(() ->
-                            new NotFoundException("Ana görev bulunamadı. id = " + request.parentTaskId()));
-
-            if (!parentTask.getProject().getId().equals(projectId)) {
-                throw new IllegalArgumentException("Alt görev başka bir projedeki göreve bağlanamaz.");
-            }
+                    .orElseThrow(() -> new NotFoundException("Üst görev bulunamadı! ID: " + request.parentTaskId()));
         }
 
         Task task = Task.builder()
                 .title(request.title())
                 .description(request.description())
-                .priority(request.priority())
+                .status(request.status() != null ? request.status() : TaskStatus.TODO)
+                .priority(request.priority() != null ? request.priority() : Priority.MEDIUM)
                 .dueDate(request.dueDate())
                 .estimatedHours(request.estimatedHours())
                 .project(project)
+                .assignee(assignee)
                 .parentTask(parentTask)
                 .build();
 
         Task savedTask = taskRepository.save(task);
+
+        TaskStatusHistory history = TaskStatusHistory.builder()
+                .task(savedTask)
+                .status(savedTask.getStatus())
+                .build();
+        taskStatusHistoryRepository.save(history);
 
         return mapToResponse(savedTask);
     }
@@ -109,182 +125,63 @@ public class TaskService {
     @Transactional(readOnly = true)
     public Page<TaskResponse> getTasksByProjectId(
             Long projectId,
-            String search,
             TaskStatus status,
             Priority priority,
             Long assigneeId,
-            LocalDate startDate,
-            LocalDate endDate,
+            LocalDate dueDate,
+            Long labelId,
             Pageable pageable,
             Authentication authentication) {
 
         User currentUser = getCurrentUser(authentication);
-
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() ->
-                        new NotFoundException(
-                                "Proje bulunamadı. id = " + projectId
-                        ));
+                .orElseThrow(() -> new NotFoundException("Proje bulunamadı! ID: " + projectId));
 
-        boolean hasAccess =
-                project.getOwner().getId().equals(currentUser.getId()) ||
-                project.getMembers().stream()
-                        .anyMatch(member ->
-                                member.getId().equals(currentUser.getId()));
+        validateProjectAccess(project, currentUser);
 
-        if (!hasAccess) {
-            throw new AccessDeniedException(
-                    "Bu projeye erişim yetkiniz bulunmamaktadır."
-            );
-        }
+        Specification<Task> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("project").get("id"), projectId));
 
-        if (startDate != null
-                && endDate != null
-                && startDate.isAfter(endDate)) {
+            if (status != null) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (priority != null) {
+                predicates.add(cb.equal(root.get("priority"), priority));
+            }
+            if (assigneeId != null) {
+                predicates.add(cb.equal(root.get("assignee").get("id"), assigneeId));
+            }
+            if (dueDate != null) {
+                predicates.add(cb.equal(root.get("dueDate"), dueDate));
+            }
+            if (labelId != null) {
+                Join<Task, Label> labelJoin = root.join("labels");
+                predicates.add(cb.equal(labelJoin.get("id"), labelId));
+            }
 
-            throw new IllegalArgumentException(
-                    "Başlangıç tarihi bitiş tarihinden sonra olamaz."
-            );
-        }
+            query.distinct(true);
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
 
-
-        Specification<Task> specification =
-        		(root, query, cb) -> cb.equal(root.get("project").get("id"), projectId);
-
-        			if (search != null && !search.trim().isEmpty()) {
-
-        				String searchPattern = "%" + search.trim().toLowerCase() + "%";
-
-        					specification = specification.and( (root, query, cb) ->
-        						cb.or( cb.like( cb.lower(root.get("title")), searchPattern ),
-		 						cb.like(cb.lower(root.get("description")), searchPattern)));
-                        }                        
-                 
-        if (status != null) {
-            specification = specification.and(
-                    (root, query, cb) ->
-                            cb.equal(root.get("status"), status)
-            );
-        }
-
-        if (priority != null) {
-            specification = specification.and(
-                    (root, query, cb) ->
-                            cb.equal(root.get("priority"), priority)
-            );
-        }
-
-        if (assigneeId != null) {
-            specification = specification.and(
-                    (root, query, cb) ->
-                            cb.equal(root.get("assignee").get("id"), assigneeId)
-            );
-        }
-
-        if (startDate != null) {
-            specification = specification.and(
-                    (root, query, cb) ->
-                            cb.greaterThanOrEqualTo(
-                                    root.get("dueDate"),
-                                    startDate
-                            )
-            );
-        }
-
-        if (endDate != null) {
-            specification = specification.and(
-                    (root, query, cb) ->
-                            cb.lessThanOrEqualTo(
-                                    root.get("dueDate"),
-                                    endDate
-                            )
-            );
-        }
-
-        Page<Task> taskPage =
-                taskRepository.findAll(specification, pageable);
-
-        return taskPage.map(this::mapToResponse);
-     }
-
-    @Transactional(readOnly = true)
-    public List<TaskResponse> getSubTasks(
-            Long taskId,
-            Authentication authentication) {
-
-        User currentUser = getCurrentUser(authentication);
-
-        Task parentTask = taskRepository.findById(taskId)
-                .orElseThrow(() ->
-                        new NotFoundException(
-                                "Ana görev bulunamadı. id = " + taskId
-                        ));
-
-        Project project = parentTask.getProject();
-
-        boolean hasAccess =
-                project.getOwner().getId().equals(currentUser.getId()) ||
-                project.getMembers().stream()
-                        .anyMatch(member ->
-                                member.getId().equals(currentUser.getId()));
-
-        if (!hasAccess) {
-            throw new AccessDeniedException(
-                    "Bu görevin alt görevlerini görüntüleme yetkiniz bulunmamaktadır."
-            );
-        }
-
-        return taskRepository.findByParentTaskId(taskId)
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
+        return taskRepository.findAll(spec, pageable).map(this::mapToResponse);
     }
-    
+
     @Transactional(readOnly = true)
     public TaskResponse getTaskById(Long id, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-
         Task task = taskRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + id));
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
         validateTaskAccess(task, currentUser);
-
         return mapToResponse(task);
     }
 
-    @Transactional(readOnly = true)
-    public List<TaskStatusHistoryResponse> getTaskStatusHistory(
-            Long taskId,
-            Authentication authentication) {
-
-        User currentUser = getCurrentUser(authentication);
-
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() ->
-                        new NotFoundException(
-                                "Görev bulunamadı. id = " + taskId
-                        ));
-
-        validateTaskAccess(task, currentUser);
-
-        return taskStatusHistoryRepository
-                .findByTaskIdOrderByCreatedAtAsc(taskId)
-                .stream()
-                .map(history -> new TaskStatusHistoryResponse(
-                        history.getId(),
-                        history.getTask().getId(),
-                        history.getStatus(),
-                        history.getCreatedAt()
-                ))
-                .toList();
-    }
-    
     @Transactional
     public TaskResponse updateTask(Long id, UpdateTaskRequest request, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-
         Task task = taskRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + id));
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
         validateTaskAccess(task, currentUser);
 
@@ -299,30 +196,18 @@ public class TaskService {
     }
 
     @Transactional
-    public TaskResponse updateTaskStatus(
-            Long id,
-            UpdateTaskStatusRequest request,
-            Authentication authentication) {
-
+    public TaskResponse updateTaskStatus(Long id, UpdateTaskStatusRequest request, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-
         Task task = taskRepository.findById(id)
-                .orElseThrow(() ->
-                        new NotFoundException(
-                                "Görev bulunamadı. id = " + id
-                        ));
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
         validateTaskAccess(task, currentUser);
 
-        validateStatusTransition(
-                task.getStatus(),
-                request.status()
-        );
-        
         if (task.getStatus() == request.status()) {
             return mapToResponse(task);
         }
 
+        validateStatusTransition(task.getStatus(), request.status());
         task.setStatus(request.status());
 
         Task updatedTask = taskRepository.save(task);
@@ -331,7 +216,6 @@ public class TaskService {
                 .task(updatedTask)
                 .status(updatedTask.getStatus())
                 .build();
-
         taskStatusHistoryRepository.save(history);
 
         return mapToResponse(updatedTask);
@@ -341,19 +225,34 @@ public class TaskService {
     public List<TaskResponse> bulkUpdateStatus(BulkUpdateStatusRequest request, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
         List<Task> tasksToUpdate = new ArrayList<>();
+        List<TaskStatusHistory> histories = new ArrayList<>();
 
         for (Long id : request.taskIds()) {
             Task task = taskRepository.findById(id)
                     .orElseThrow(() -> new NotFoundException("Toplu güncelleme sırasında görev bulunamadı. id = " + id));
 
             validateTaskAccess(task, currentUser);
-
             validateStatusTransition(task.getStatus(), request.status());
+
+            if (task.getStatus() == request.status()) {
+                continue;
+            }
+
             task.setStatus(request.status());
             tasksToUpdate.add(task);
         }
 
         List<Task> updatedTasks = taskRepository.saveAll(tasksToUpdate);
+
+        for (Task task : updatedTasks) {
+            TaskStatusHistory history = TaskStatusHistory.builder()
+                    .task(task)
+                    .status(task.getStatus())
+                    .build();
+            histories.add(history);
+        }
+
+        taskStatusHistoryRepository.saveAll(histories);
 
         return updatedTasks.stream()
                 .map(this::mapToResponse)
@@ -361,182 +260,140 @@ public class TaskService {
     }
 
     @Transactional
-    public TaskResponse duplicateTask(Long id, Authentication authentication) {
+    public TaskResponse updateTaskAssignee(Long id, UpdateTaskAssigneeRequest request, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
+        Task task = taskRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
-        Task sourceTask = taskRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Kopyalanacak görev bulunamadı. id = " + id));
+        validateTaskAccess(task, currentUser);
 
-        validateTaskAccess(sourceTask, currentUser);
+        if (request.assigneeId() == null) {
+            task.setAssignee(null);
+        } else {
+            User newAssignee = userRepository.findById(request.assigneeId())
+                    .orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı! ID: " + request.assigneeId()));
 
-        Task duplicatedTask = Task.builder()
-                .title(sourceTask.getTitle() + " - Kopya")
-                .description(sourceTask.getDescription())
-                .status(TaskStatus.TODO)
-                .priority(sourceTask.getPriority())
-                .dueDate(sourceTask.getDueDate())
-                .estimatedHours(sourceTask.getEstimatedHours())
-                .project(sourceTask.getProject())
-                .build();
+            boolean isAssigneeMember = task.getProject().getMembers().stream()
+                    .anyMatch(m -> m.getId().equals(request.assigneeId())) || task.getProject().getOwner().getId().equals(request.assigneeId());
 
-        Task savedDuplicate = taskRepository.save(duplicatedTask);
-        return mapToResponse(savedDuplicate);
+            if (!isAssigneeMember) {
+                throw new AccessDeniedException("Yalnızca proje üyelerine görev atanabilir!");
+            }
+
+            task.setAssignee(newAssignee);
+        }
+
+        Task updatedTask = taskRepository.save(task);
+        return mapToResponse(updatedTask);
     }
 
     @Transactional
     public void deleteTask(Long id, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-
         Task task = taskRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + id));
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
         validateTaskAccess(task, currentUser);
-
         taskRepository.delete(task);
     }
-    
-    @Transactional
-    public TaskResponse assignTask(Long id, UpdateTaskAssigneeRequest request, Authentication authentication) {
 
+    @Transactional(readOnly = true)
+    public List<TaskResponse> getTasksAssignedToMe(Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
+        return taskRepository.findByAssignee(currentUser).stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
 
-        Task task = taskRepository.findById(id)
-                .orElseThrow(() ->
-                        new NotFoundException("Görev bulunamadı. id = " + id));
+    @Transactional(readOnly = true)
+    public List<TaskStatusHistoryResponse> getTaskStatusHistory(Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + taskId));
+
+        return taskStatusHistoryRepository.findByTaskOrderByCreatedAtDesc(task)
+                .stream()
+                .map(history -> new TaskStatusHistoryResponse(
+                        history.getId(),
+                        history.getTask().getId(),
+                        history.getStatus(),
+                        history.getCreatedAt()
+                ))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectStatsResponse getProjectStats(Long projectId, Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Proje bulunamadı: id=" + projectId));
+
+        validateProjectAccess(project, currentUser);
+
+        List<Task> tasks = taskRepository.findByProject(project);
+
+        long totalTasks = tasks.size();
+        Map<TaskStatus, Long> countsByStatus = tasks.stream()
+                .collect(Collectors.groupingBy(Task::getStatus, Collectors.counting()));
+
+        long todo = countsByStatus.getOrDefault(TaskStatus.TODO, 0L);
+        long inProgress = countsByStatus.getOrDefault(TaskStatus.IN_PROGRESS, 0L);
+        long done = countsByStatus.getOrDefault(TaskStatus.DONE, 0L);
+
+        return new ProjectStatsResponse(totalTasks, todo, inProgress, done);
+    }
+
+    @Transactional
+    public TaskResponse addLabelToTask(Long taskId, Long labelId, Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + taskId));
 
         validateTaskAccess(task, currentUser);
 
-        User assignee = userRepository.findById(request.assigneeId())
-                .orElseThrow(() ->
-                        new NotFoundException("Kullanıcı bulunamadı. id = " + request.assigneeId()));
+        Label label = labelRepository.findById(labelId)
+                .orElseThrow(() -> new NotFoundException("Etiket bulunamadı. id = " + labelId));
 
-        Project project = task.getProject();
-
-        boolean isProjectMember =
-                project.getOwner().getId().equals(assignee.getId()) ||
-                project.getMembers().stream()
-                        .anyMatch(member -> member.getId().equals(assignee.getId()));
-
-        if (!isProjectMember) {
-            throw new AccessDeniedException(
-                    "Atanacak kullanıcı bu projenin üyesi değildir.");
+        if (task.getLabels().contains(label)) {
+            throw new AlreadyExistsException("Bu etiket zaten göreve eklenmiş.");
         }
 
-        task.setAssignee(assignee);
-
+        task.getLabels().add(label);
         Task updatedTask = taskRepository.save(task);
-
         return mapToResponse(updatedTask);
     }
-    
-    @Transactional(readOnly = true)
-    public List<TaskResponse> getAssignedTasks(Authentication authentication) {
 
+    @Transactional
+    public TaskResponse removeLabelFromTask(Long taskId, Long labelId, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + taskId));
 
-        return taskRepository.findByAssigneeId(currentUser.getId())
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
-    }
-    
-    @Transactional(readOnly = true)
-    public ProjectStatsResponse getProjectStats( Long projectId, Authentication authentication) {
+        validateTaskAccess(task, currentUser);
 
-        User currentUser = getCurrentUser(authentication);
+        Label label = labelRepository.findById(labelId)
+                .orElseThrow(() -> new NotFoundException("Etiket bulunamadı. id = " + labelId));
 
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() ->
-                        new NotFoundException(
-                                "Proje bulunamadı. id = " + projectId
-                        ));
-
-        boolean hasAccess =
-                project.getOwner().getId().equals(currentUser.getId()) ||
-                project.getMembers().stream()
-                        .anyMatch(member ->
-                                member.getId().equals(currentUser.getId()));
-
-        if (!hasAccess) {
-            throw new AccessDeniedException(
-                    "Bu projeye erişim yetkiniz bulunmamaktadır."
-            );
+        if (!task.getLabels().contains(label)) {
+            throw new NotFoundException("Etiket bu görevde bulunamadı.");
         }
 
-        List<Task> tasks = taskRepository.findByProjectId(projectId);
-
-        long totalTasks = tasks.size();
-
-        long todo = tasks.stream()
-                .filter(task -> task.getStatus() == TaskStatus.TODO)
-                .count();
-
-        long inProgress = tasks.stream()
-                .filter(task -> task.getStatus() == TaskStatus.IN_PROGRESS)
-                .count();
-
-        long done = tasks.stream()
-                .filter(task -> task.getStatus() == TaskStatus.DONE)
-                .count();
-
-        return new ProjectStatsResponse(
-                totalTasks,
-                todo,
-                inProgress,
-                done
-        );
-    }
-
-    @Transactional(readOnly = true)
-    public List<TaskResponse> getOverdueTasks(Long projectId, Authentication authentication) {
-
-        User currentUser = getCurrentUser(authentication);
-
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() ->
-                        new NotFoundException(
-                                "Proje bulunamadı. id = " + projectId
-                        ));
-
-        boolean hasAccess =
-                project.getOwner().getId().equals(currentUser.getId()) ||
-                project.getMembers().stream()
-                        .anyMatch(member ->
-                                member.getId().equals(currentUser.getId()));
-
-        if (!hasAccess) {
-            throw new AccessDeniedException(
-                    "Bu projeye erişim yetkiniz bulunmamaktadır."
-            );
-        }
-
-        LocalDate today = LocalDate.now();
-
-        List<Task> overdueTasks = taskRepository.findByProjectId(projectId)
-                .stream()
-                .filter(task ->
-                        task.getDueDate() != null &&
-                        task.getDueDate().isBefore(today) &&
-                        task.getStatus() != TaskStatus.DONE
-                )
-                .toList();
-
-        return overdueTasks.stream()
-                .map(this::mapToResponse)
-                .toList();
-    }
-    
-    private void validateStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {
-        if (currentStatus == TaskStatus.DONE && newStatus != TaskStatus.DONE) {
-            throw new InvalidTaskStatusException("Tamamlanan görev tekrar başka bir duruma geçirilemez.");
-        }
-
-        if (currentStatus == TaskStatus.TODO && newStatus == TaskStatus.DONE) {
-            throw new InvalidTaskStatusException("Görev tamamlanmadan önce IN_PROGRESS durumuna geçirilmelidir.");
-        }
+        task.getLabels().remove(label);
+        Task updatedTask = taskRepository.save(task);
+        return mapToResponse(updatedTask);
     }
 
     private TaskResponse mapToResponse(Task task) {
+    	List<LabelResponse> labelResponses = task.getLabels() != null
+    	        ? task.getLabels().stream()
+    	            .map(label -> new LabelResponse(
+    	                    label.getId(),
+    	                    label.getName(),
+    	                    label.getColor(),
+    	                    label.getCreatedAt(),
+    	                    label.getUpdatedAt()
+    	            ))
+    	            .toList()
+    	        : List.of();
 
         return new TaskResponse(
                 task.getId(),
@@ -549,18 +406,10 @@ public class TaskService {
                 task.getEstimatedHours(),
                 task.getCreatedAt(),
                 task.getUpdatedAt(),
-
-                task.getAssignee() != null
-                        ? task.getAssignee().getId()
-                        : null,
-
-                task.getAssignee() != null
-                        ? task.getAssignee().getName()
-                        : null,
-
-                task.getParentTask() != null
-                        ? task.getParentTask().getId()
-                        : null
+                task.getAssignee() != null ? task.getAssignee().getId() : null,
+                task.getAssignee() != null ? task.getAssignee().getName() : null,
+                task.getParentTask() != null ? task.getParentTask().getId() : null,
+                labelResponses
         );
     }
 }
