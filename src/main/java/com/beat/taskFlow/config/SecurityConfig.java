@@ -50,7 +50,9 @@ public class SecurityConfig {
                         "/api/auth/forgot-password",
                         "/api/auth/reset-password",
                         "/api/ping",
-                        "/api/auth/refresh"
+                        "/api/auth/refresh",
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**"
                 ).permitAll()
                 .anyRequest().authenticated()
         )

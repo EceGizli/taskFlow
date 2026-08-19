@@ -1,5 +1,6 @@
 package com.beat.taskFlow.label.service;
 
+import com.beat.taskFlow.common.exception.AlreadyExistsException;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.label.dto.requests.CreateLabelRequest;
 import com.beat.taskFlow.label.dto.responses.LabelResponse;
@@ -19,15 +20,21 @@ public class LabelService {
 
     @Transactional
     public LabelResponse createLabel(CreateLabelRequest request) {
-
+        if (labelRepository.existsByNameIgnoreCase(request.name())) {
+            throw new AlreadyExistsException("Bu isimde bir etiket zaten mevcut: " + request.name());
+        }
         Label label = Label.builder()
                 .name(request.name())
                 .color(request.color())
                 .build();
+        return mapToResponse(labelRepository.save(label));
+    }
 
-        Label savedLabel = labelRepository.save(label);
-
-        return mapToResponse(savedLabel);
+    @Transactional
+    public void deleteLabel(Long id) {
+        Label label = labelRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Etiket bulunamadı: id=" + id));
+        labelRepository.delete(label);
     }
 
     @Transactional(readOnly = true)

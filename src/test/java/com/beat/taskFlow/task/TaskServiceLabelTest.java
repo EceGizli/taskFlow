@@ -1,0 +1,93 @@
+package com.beat.taskFlow.task;
+
+import com.beat.taskFlow.label.entity.Label;
+import com.beat.taskFlow.label.repository.LabelRepository;
+import com.beat.taskFlow.project.entity.concretes.Project;
+import com.beat.taskFlow.project.repository.ProjectRepository;
+import com.beat.taskFlow.task.dto.responses.TaskResponse;
+import com.beat.taskFlow.task.entity.concretes.Task;
+import com.beat.taskFlow.task.repository.TaskRepository;
+import com.beat.taskFlow.task.repository.TaskStatusHistoryRepository;
+import com.beat.taskFlow.task.service.TaskService;
+import com.beat.taskFlow.user.entity.concretes.User;
+import com.beat.taskFlow.user.repository.UserRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
+
+import java.util.HashSet;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class TaskServiceLabelTest {
+
+    @Mock
+    private TaskRepository taskRepository;
+
+    @Mock
+    private ProjectRepository projectRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private TaskStatusHistoryRepository taskStatusHistoryRepository;
+
+    @Mock
+    private LabelRepository labelRepository;
+
+    @Mock
+    private Authentication authentication;
+
+    @Mock
+    private User user;
+
+    @Mock
+    private Project project;
+
+    @Mock
+    private Task task;
+
+    @Mock
+    private Label label;
+
+    @InjectMocks
+    private TaskService taskService;
+
+    @Test
+    void addLabelToTask_shouldAddLabel_whenTaskAndLabelAreValid() {
+
+        when(authentication.getName()).thenReturn("test@mail.com");
+        when(userRepository.findByEmail("test@mail.com"))
+                .thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(1L);
+
+        when(taskRepository.findById(10L))
+                .thenReturn(Optional.of(task));
+
+        when(task.getProject()).thenReturn(project);
+        when(project.getOwner()).thenReturn(user);
+        when(project.getMembers()).thenReturn(new HashSet<>());
+
+        when(labelRepository.findById(20L))
+                .thenReturn(Optional.of(label));
+
+        when(task.getLabels()).thenReturn(new HashSet<>());
+
+        when(taskRepository.save(task)).thenReturn(task);
+
+        TaskResponse response = taskService.addLabelToTask(10L, 20L, authentication );
+
+        assertThat(task.getLabels()).contains(label);
+        verify(taskRepository, times(1)).save(task);
+        verify(labelRepository, times(1)).findById(20L);
+    }
+}
