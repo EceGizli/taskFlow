@@ -4,6 +4,9 @@ import com.beat.taskFlow.comment.dto.requests.CreateCommentRequest;
 import com.beat.taskFlow.comment.dto.requests.UpdateCommentRequest;
 import com.beat.taskFlow.comment.dto.responses.CommentResponse;
 import com.beat.taskFlow.comment.service.CommentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,10 +18,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
+@Tag(name = "Comments", description = "Görev yorumları yönetimi uçları")
+@SecurityRequirement(name = "bearerAuth")
 public class CommentController {
 
     private final CommentService commentService;
 
+    @Operation(summary = "Göreve yorum ekle", description = "Belirtilen göreve yeni bir yorum ekler.")
     @PostMapping("/tasks/{taskId}/comments")
     @ResponseStatus(HttpStatus.CREATED)
     public CommentResponse createComment(
@@ -29,6 +35,7 @@ public class CommentController {
         return commentService.createComment(taskId, request, authentication);
     }
 
+    @Operation(summary = "Görevin yorumlarını listele", description = "Belirtilen göreve ait tüm yorumları listeler.")
     @GetMapping("/tasks/{taskId}/comments")
     public List<CommentResponse> getCommentsByTask(
             @PathVariable Long taskId,
@@ -36,7 +43,8 @@ public class CommentController {
 
         return commentService.getCommentsByTask(taskId, authentication);
     }
-    
+
+    @Operation(summary = "Yorumu güncelle", description = "Yorumun içeriğini günceller (Sadece yorum sahibi).")
     @PutMapping("/comments/{commentId}")
     public CommentResponse updateComment(
             @PathVariable Long commentId,
@@ -45,7 +53,8 @@ public class CommentController {
 
         return commentService.updateComment(commentId, request, authentication);
     }
-    
+
+    @Operation(summary = "Yorumu sil", description = "Belirtilen yorumu siler (Yorum sahibi veya proje sahibi).")
     @DeleteMapping("/comments/{commentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteComment(

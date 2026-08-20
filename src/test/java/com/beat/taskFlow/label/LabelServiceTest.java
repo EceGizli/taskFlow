@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,5 +72,20 @@ class LabelServiceTest {
 
         assertThatThrownBy(() -> labelService.deleteLabel(99L))
                 .isInstanceOf(NotFoundException.class);
+    }
+    
+    @Test
+    void getAllLabels_shouldReturnAllLabels() {
+        Label label1 = new Label();
+        label1.setName("bug");
+        Label label2 = new Label();
+        label2.setName("feature");
+
+        when(labelRepository.findAll()).thenReturn(List.of(label1, label2));
+
+        List<LabelResponse> responses = labelService.getAllLabels();
+
+        assertThat(responses).hasSize(2);
+        verify(labelRepository, times(1)).findAll();
     }
 }

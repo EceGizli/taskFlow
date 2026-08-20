@@ -1,5 +1,7 @@
 package com.beat.taskFlow.task;
 
+import com.beat.taskFlow.common.exception.AlreadyExistsException;
+import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.label.entity.Label;
 import com.beat.taskFlow.label.repository.LabelRepository;
 import com.beat.taskFlow.project.entity.concretes.Project;
@@ -22,7 +24,7 @@ import java.util.HashSet;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,31 +65,93 @@ class TaskServiceLabelTest {
 
     @Test
     void addLabelToTask_shouldAddLabel_whenTaskAndLabelAreValid() {
-
         when(authentication.getName()).thenReturn("test@mail.com");
-        when(userRepository.findByEmail("test@mail.com"))
-                .thenReturn(Optional.of(user));
-
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(user));
         when(user.getId()).thenReturn(1L);
 
-        when(taskRepository.findById(10L))
-                .thenReturn(Optional.of(task));
-
+        when(taskRepository.findById(10L)).thenReturn(Optional.of(task));
         when(task.getProject()).thenReturn(project);
         when(project.getOwner()).thenReturn(user);
         when(project.getMembers()).thenReturn(new HashSet<>());
 
-        when(labelRepository.findById(20L))
-                .thenReturn(Optional.of(label));
-
+        when(labelRepository.findById(20L)).thenReturn(Optional.of(label));
         when(task.getLabels()).thenReturn(new HashSet<>());
-
         when(taskRepository.save(task)).thenReturn(task);
 
-        TaskResponse response = taskService.addLabelToTask(10L, 20L, authentication );
+        TaskResponse response = taskService.addLabelToTask(10L, 20L, authentication);
 
         assertThat(task.getLabels()).contains(label);
         verify(taskRepository, times(1)).save(task);
         verify(labelRepository, times(1)).findById(20L);
+    }
+
+    @Test
+    void removeLabelFromTask_shouldRemoveLabel_whenTaskAndLabelAreValid() {
+        when(authentication.getName()).thenReturn("test@mail.com");
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(1L);
+
+        when(taskRepository.findById(10L)).thenReturn(Optional.of(task));
+        when(task.getProject()).thenReturn(project);
+        when(project.getOwner()).thenReturn(user);
+        when(project.getMembers()).thenReturn(new HashSet<>());
+
+        when(labelRepository.findById(20L)).thenReturn(Optional.of(label));
+
+        HashSet<Label> labels = new HashSet<>();
+        labels.add(label);
+        when(task.getLabels()).thenReturn(labels);
+        when(taskRepository.save(task)).thenReturn(task);
+
+        TaskResponse response = taskService.removeLabelFromTask(10L, 20L, authentication);
+
+        assertThat(task.getLabels()).doesNotContain(label);
+        verify(taskRepository, times(1)).save(task);
+        verify(labelRepository, times(1)).findById(20L);
+    }
+
+    @Test
+    void addLabelToTask_shouldThrowAlreadyExistsException_whenLabelAlreadyExists() {
+        when(authentication.getName()).thenReturn("test@mail.com");
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(1L);
+
+        when(taskRepository.findById(10L)).thenReturn(Optional.of(task));
+        when(task.getProject()).thenReturn(project);
+        when(project.getOwner()).thenReturn(user);
+        when(project.getMembers()).thenReturn(new HashSet<>());
+
+        when(labelRepository.findById(20L)).thenReturn(Optional.of(label));
+
+        HashSet<Label> labels = new HashSet<>();
+        labels.add(label);
+        when(task.getLabels()).thenReturn(labels);
+
+        assertThrows(AlreadyExistsException.class, () -> 
+            taskService.addLabelToTask(10L, 20L, authentication)
+        );
+
+        verify(taskRepository, never()).save(task);
+    }
+
+    @Test
+    void removeLabelFromTask_shouldThrowNotFoundException_whenLabelDoesNotExistOnTask() {
+        when(authentication.getName()).thenReturn("test@mail.com");
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(1L);
+
+        when(taskRepository.findById(10L)).thenReturn(Optional.of(task));
+        when(task.getProject()).thenReturn(project);
+        when(project.getOwner()).thenReturn(user);
+        when(project.getMembers()).thenReturn(new HashSet<>());
+
+        when(labelRepository.findById(20L)).thenReturn(Optional.of(label));
+        when(task.getLabels()).thenReturn(new HashSet<>());
+
+        assertThrows(NotFoundException.class, () -> 
+            taskService.removeLabelFromTask(10L, 20L, authentication)
+        );
+
+        verify(taskRepository, never()).save(task);
     }
 }
