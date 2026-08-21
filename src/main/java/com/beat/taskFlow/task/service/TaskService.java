@@ -67,11 +67,20 @@ public class TaskService {
     }
 
     private void validateStatusTransition(TaskStatus currentStatus, TaskStatus newStatus) {
-        if (currentStatus == TaskStatus.DONE && newStatus == TaskStatus.TODO) {
-            throw new InvalidTaskStatusException("Tamamlanmış bir görev (DONE) doğrudan TODO durumuna çekilemez!");
+        if (currentStatus == newStatus) return;
+
+        boolean allowed = switch (currentStatus) {
+            case TODO -> newStatus == TaskStatus.IN_PROGRESS;
+            case IN_PROGRESS -> newStatus == TaskStatus.DONE || newStatus == TaskStatus.TODO;
+            case DONE -> newStatus == TaskStatus.IN_PROGRESS;
+        };
+
+        if (!allowed) {
+            throw new InvalidTaskStatusException(
+                    "Geçersiz durum geçişi: " + currentStatus + " -> " + newStatus
+            );
         }
     }
-
     @Transactional
     public TaskResponse createTask(Long projectId, CreateTaskRequest request, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
@@ -306,9 +315,12 @@ public class TaskService {
     }
 
     @Transactional(readOnly = true)
-    public List<TaskStatusHistoryResponse> getTaskStatusHistory(Long taskId) {
+    public List<TaskStatusHistoryResponse> getTaskStatusHistory(Long taskId, Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + taskId));
+
+        validateTaskAccess(task, currentUser);
 
         return taskStatusHistoryRepository.findByTaskOrderByCreatedAtDesc(task)
                 .stream()

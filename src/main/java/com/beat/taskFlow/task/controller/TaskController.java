@@ -32,8 +32,8 @@ public class TaskController {
 
     @Operation(
             summary = "Görev oluştur",
-            description = "Bir projeye yeni görev oluşturur."
-    )
+            description = "Bir projeye yeni görev oluşturur.")
+    
     @PostMapping("/projects/{projectId}/tasks")
     public ResponseEntity<TaskResponse> createTask(
             @PathVariable Long projectId,
@@ -75,8 +75,8 @@ public class TaskController {
 
     @Operation(
             summary = "Görevi getir",
-            description = "Belirtilen ID değerine sahip görevi getirir."
-    )
+            description = "Belirtilen ID değerine sahip görevi getirir.")
+    
     @GetMapping("/tasks/{id}")
     public ResponseEntity<TaskResponse> getTaskById(
             @PathVariable Long id,
@@ -163,13 +163,14 @@ public class TaskController {
 
     @Operation(
             summary = "Görev durum geçmişini getir",
-            description = "Belirtilen görevin durum değişiklik geçmişini getirir."
-    )
+            description = "Belirtilen görevin durum değişiklik geçmişini getirir.")
+    
     @GetMapping("/tasks/{id}/status-history")
     public ResponseEntity<List<TaskStatusHistoryResponse>> getTaskStatusHistory(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication) {
 
-        return ResponseEntity.ok(taskService.getTaskStatusHistory(id));
+        return ResponseEntity.ok(taskService.getTaskStatusHistory(id, authentication));
     }
 
     @Operation(

@@ -86,6 +86,7 @@ public class UserService {
         userRepository.save(user);
 
         String accessToken = jwtService.generateToken(user);
+        refreshTokenService.revokeAllTokensForUser(user);
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
         return new LoginResponse(
@@ -100,13 +101,12 @@ public class UserService {
 
     @Transactional
     public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
-        RefreshToken token = refreshTokenService.findByToken(request.refreshToken());
-        refreshTokenService.verifyExpiration(token);
+        RefreshToken oldToken = refreshTokenService.findByToken(request.refreshToken());
+        RefreshToken newToken = refreshTokenService.rotateRefreshToken(oldToken);
 
-        User user = token.getUser();
-        String newAccessToken = jwtService.generateToken(user);
+        String newAccessToken = jwtService.generateToken(newToken.getUser());
 
-        return new RefreshTokenResponse(newAccessToken, token.getToken(), "Bearer");
+        return new RefreshTokenResponse(newAccessToken, newToken.getToken(), "Bearer");
     }
 
     public MeResponse getCurrentUser(String email) {

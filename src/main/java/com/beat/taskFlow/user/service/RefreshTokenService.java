@@ -23,24 +23,36 @@ public class RefreshTokenService {
 
     @Transactional
     public RefreshToken createRefreshToken(User user) {
-        RefreshToken refreshToken = refreshTokenRepository.findByUser(user)
-                .orElseGet(() -> RefreshToken.builder()
-                        .user(user)
-                        .build());
-
-        refreshToken.setToken(UUID.randomUUID().toString());
-        refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenDurationMs));
-        refreshToken.setRevoked(false);
-
+        RefreshToken refreshToken = RefreshToken.builder()
+                .user(user)
+                .token(UUID.randomUUID().toString())
+                .expiryDate(Instant.now().plusMillis(refreshTokenDurationMs))
+                .revoked(false)
+                .build();
         return refreshTokenRepository.save(refreshToken);
     }
 
+    @Transactional
+    public RefreshToken rotateRefreshToken(RefreshToken oldToken) {
+        verifyExpiration(oldToken);
+        oldToken.setRevoked(true);
+        refreshTokenRepository.save(oldToken);
+        return createRefreshToken(oldToken.getUser());
+    }
+
     public RefreshToken verifyExpiration(RefreshToken token) {
-        if (token.getExpiryDate().compareTo(Instant.now()) < 0 || token.isRevoked()) {
-            refreshTokenRepository.delete(token);
+        if (token.isRevoked() || token.getExpiryDate().compareTo(Instant.now()) < 0) {
+            token.setRevoked(true);
+            refreshTokenRepository.save(token);
             throw new InvalidTokenException("Refresh token süresi dolmuş veya geçersiz.");
         }
         return token;
+    }
+
+    @Transactional
+    public void revokeAllTokensForUser(User user) {
+        refreshTokenRepository.findAllByUserAndRevokedFalse(user)
+                .forEach(t -> t.setRevoked(true));
     }
 
     public RefreshToken findByToken(String token) {

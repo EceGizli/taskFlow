@@ -96,7 +96,6 @@ public class ProjectService {
         project.setTag(request.tag());
         project.setStatus(ProjectStatus.ACTIVE);
         project.setOwner(currentUser);
-        project.getMembers().add(currentUser);
 
         Project savedProject = projectRepository.save(project);
         return convertToResponse(savedProject);
@@ -226,7 +225,8 @@ public class ProjectService {
             throw new IllegalArgumentException("Zaten bu projenin sahibisiniz.");
         }
 
-        project.getMembers().add(newOwner);
+        project.getMembers().remove(newOwner);
+        project.getMembers().add(currentOwner);
         project.setOwner(newOwner);
 
         Project updatedProject = projectRepository.save(project);
@@ -243,7 +243,7 @@ public class ProjectService {
                 project.getStatus(),
                 project.getOwner().getId(),
                 project.getOwner().getName(),
-                project.getMembers().size(),
+                project.getMembers().size() + 1, // owner dahil
                 project.getCreatedAt(),
                 project.getUpdatedAt()
         );

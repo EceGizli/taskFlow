@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Labels", description = "Etiket yönetimi uçları")
@@ -25,11 +26,10 @@ public class LabelController {
             summary = "Etiket oluştur",
             description = "Yeni bir etiket oluşturur."
     )
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public LabelResponse createLabel(
-            @Valid @RequestBody CreateLabelRequest request) {
-
+    public LabelResponse createLabel(@Valid @RequestBody CreateLabelRequest request) {
         return labelService.createLabel(request);
     }
 
@@ -47,6 +47,7 @@ public class LabelController {
             summary = "Etiketi sil",
             description = "Belirtilen etiketi siler."
     )
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteLabel(@PathVariable Long id) {
