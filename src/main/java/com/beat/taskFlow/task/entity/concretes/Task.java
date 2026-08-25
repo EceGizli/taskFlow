@@ -10,6 +10,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -39,6 +40,12 @@ public class Task extends BaseEntity {
     private LocalDate dueDate;
 
     private Integer estimatedHours;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean isDeleted = false;
+
+    private LocalDateTime deletedAt;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "project_id")

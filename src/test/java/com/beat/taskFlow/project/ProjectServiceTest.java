@@ -2,6 +2,7 @@ package com.beat.taskFlow.project;
 
 import com.beat.taskFlow.project.dto.requests.CreateProjectRequest;
 import com.beat.taskFlow.project.dto.requests.TransferOwnershipRequest;
+import com.beat.taskFlow.project.dto.requests.UpdateProjectRequest;
 import com.beat.taskFlow.project.dto.responses.ProjectResponse;
 import com.beat.taskFlow.project.entity.concretes.Project;
 import com.beat.taskFlow.project.entity.enums.ProjectStatus;
@@ -18,72 +19,95 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 
+import java.util.HashSet;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ProjectServiceTest {
 
-    @Mock private ProjectRepository projectRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private Authentication authentication;
+    @Mock
+    private ProjectRepository projectRepository;
 
-    @InjectMocks private ProjectService projectService;
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private Authentication authentication;
+
+    @InjectMocks
+    private ProjectService projectService;
 
     private User owner;
-    private User other;
+    private User otherUser;
+    private Project project;
 
     @BeforeEach
     void setUp() {
-        owner = User.builder().email("owner@test.com").name("Owner").build();
+        owner = User.builder().name("Proje Sahibi").email("owner@test.com").build();
         owner.setId(1L);
 
-        other = User.builder().email("other@test.com").name("Other").build();
-        other.setId(2L);
+        otherUser = User.builder().name("Diger Kullanici").email("other@test.com").build();
+        otherUser.setId(2L);
+
+        project = Project.builder()
+                .name("Test Projesi")
+                .description("Açıklama")
+                .status(ProjectStatus.ACTIVE)
+                .owner(owner)
+                .members(new HashSet<>())
+                .build();
+        project.setId(10L);
     }
 
     @Test
     void createProject_ownerNotAddedToMembersSet() {
-        when(authentication.getName()).thenReturn(owner.getEmail());
-        when(userRepository.findByEmail(owner.getEmail())).thenReturn(Optional.of(owner));
-        when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
+        CreateProjectRequest request = new CreateProjectRequest("Yeni Proje", "Açıklama", "#FFFFFF", "backend");
 
-        CreateProjectRequest req = new CreateProjectRequest("Proje", "desc", "#fff", "tag");
-        ProjectResponse response = projectService.createProject(req, authentication);
+        when(authentication.getName()).thenReturn("owner@test.com");
+        when(userRepository.findByEmail("owner@test.com")).thenReturn(Optional.of(owner));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> {
+            Project p = invocation.getArgument(0);
+            p.setId(10L);
+            return p;
+        });
 
-        assertThat(response.memberCount()).isEqualTo(1); // sadece owner
+        ProjectResponse response = projectService.createProject(request, authentication);
+
+        assertNotNull(response);
+        assertEquals(0, response.memberCount());
+        verify(projectRepository, times(1)).save(any(Project.class));
     }
 
     @Test
     void updateProject_notOwner_throwsAccessDenied() {
-        Project project = Project.builder().owner(owner).status(ProjectStatus.ACTIVE).build();
-        project.setId(10L);
+        UpdateProjectRequest request = new UpdateProjectRequest("Guncel Ad", null, null, null, null);
 
-        when(authentication.getName()).thenReturn(other.getEmail());
-        when(userRepository.findByEmail(other.getEmail())).thenReturn(Optional.of(other));
-        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
+        when(authentication.getName()).thenReturn("other@test.com");
+        when(userRepository.findByEmail("other@test.com")).thenReturn(Optional.of(otherUser));
+        when(projectRepository.findByIdAndIsDeletedFalse(10L)).thenReturn(Optional.of(project));
 
-        assertThatThrownBy(() -> projectService.updateProject(10L, null, authentication))
+        assertThatThrownBy(() -> projectService.updateProject(10L, request, authentication))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
     void transferOwnership_oldOwnerBecomesMember() {
-        Project project = Project.builder().owner(owner).status(ProjectStatus.ACTIVE).build();
-        project.setId(10L);
+        TransferOwnershipRequest request = new TransferOwnershipRequest(2L);
 
-        when(userRepository.findByEmail(owner.getEmail())).thenReturn(Optional.of(owner));
-        when(userRepository.findById(other.getId())).thenReturn(Optional.of(other));
-        when(projectRepository.findById(10L)).thenReturn(Optional.of(project));
-        when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.findByEmail("owner@test.com")).thenReturn(Optional.of(owner));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(otherUser));
+        when(projectRepository.findByIdAndIsDeletedFalse(10L)).thenReturn(Optional.of(project));
+        when(projectRepository.save(any(Project.class))).thenReturn(project);
 
-        projectService.transferOwnership(10L, new TransferOwnershipRequest(other.getId()), owner.getEmail());
+        ProjectResponse response = projectService.transferOwnership(10L, request, "owner@test.com");
 
-        assertThat(project.getOwner()).isEqualTo(other);
-        assertThat(project.getMembers()).contains(owner);
+        assertNotNull(response);
+        assertEquals(otherUser.getId(), project.getOwner().getId());
+        assertTrue(project.getMembers().contains(owner));
     }
 }

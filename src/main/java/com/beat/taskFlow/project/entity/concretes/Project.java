@@ -6,6 +6,7 @@ import com.beat.taskFlow.user.entity.concretes.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -18,32 +19,37 @@ import java.util.Set;
 @Builder
 public class Project extends BaseEntity {
 
-    @Column(nullable = false, length = 150)
+    @Column(nullable = false)
     private String name;
 
     @Column(columnDefinition = "TEXT")
     private String description;
-    
-    @Column(length = 20)
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private ProjectStatus status = ProjectStatus.ACTIVE;
+
+    @Column(length = 7)
     private String color;
 
-    @Column(length = 50)
     private String tag;
-    
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private ProjectStatus status;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean isDeleted = false;
+
+    private LocalDateTime deletedAt;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "owner_id", nullable = false)
+    @JoinColumn(name = "owner_id")
     private User owner;
 
-    @Builder.Default
-    @ManyToMany(fetch = FetchType.LAZY)
+    @ManyToMany
     @JoinTable(
             name = "project_members",
             joinColumns = @JoinColumn(name = "project_id"),
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
+    @Builder.Default
     private Set<User> members = new HashSet<>();
 }

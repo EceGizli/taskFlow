@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -32,8 +33,8 @@ public class TaskController {
 
     @Operation(
             summary = "Görev oluştur",
-            description = "Bir projeye yeni görev oluşturur.")
-    
+            description = "Bir projeye yeni görev oluşturur."
+    )
     @PostMapping("/projects/{projectId}/tasks")
     public ResponseEntity<TaskResponse> createTask(
             @PathVariable Long projectId,
@@ -49,34 +50,26 @@ public class TaskController {
             description = "Bir projenin görevlerini filtreleme, sıralama ve sayfalama seçenekleriyle listeler."
     )
     @GetMapping("/projects/{projectId}/tasks")
-    public ResponseEntity<Page<TaskResponse>> getTasksByProjectId(
+    public ResponseEntity<Page<TaskResponse>> getTasks(
             @PathVariable Long projectId,
             @RequestParam(required = false) TaskStatus status,
             @RequestParam(required = false) Priority priority,
             @RequestParam(required = false) Long assigneeId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
             @RequestParam(required = false) Long labelId,
+            @RequestParam(required = false) String search,
             Pageable pageable,
             Authentication authentication) {
 
-        return ResponseEntity.ok(
-                taskService.getTasksByProjectId(
-                        projectId,
-                        status,
-                        priority,
-                        assigneeId,
-                        dueDate,
-                        labelId,
-                        pageable,
-                        authentication
-                )
-        );
+        return ResponseEntity.ok(taskService.getTasksByProjectId(
+                projectId, status, priority, assigneeId, dueDate, labelId, search, pageable, authentication
+        ));
     }
 
     @Operation(
             summary = "Görevi getir",
-            description = "Belirtilen ID değerine sahip görevi getirir.")
-    
+            description = "Belirtilen ID değerine sahip görevi getirir."
+    )
     @GetMapping("/tasks/{id}")
     public ResponseEntity<TaskResponse> getTaskById(
             @PathVariable Long id,
@@ -116,11 +109,12 @@ public class TaskController {
             description = "Birden fazla görevin durumunu tek istekte günceller."
     )
     @PatchMapping("/tasks/bulk-status")
-    public ResponseEntity<List<TaskResponse>> bulkUpdateStatus(
+    public ResponseEntity<Void> bulkUpdateStatus(
             @Valid @RequestBody BulkUpdateStatusRequest request,
             Authentication authentication) {
 
-        return ResponseEntity.ok(taskService.bulkUpdateStatus(request, authentication));
+        taskService.bulkUpdateStatus(request, authentication);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(
@@ -146,7 +140,6 @@ public class TaskController {
             Authentication authentication) {
 
         taskService.deleteTask(id, authentication);
-
         return ResponseEntity.noContent().build();
     }
 
@@ -163,8 +156,8 @@ public class TaskController {
 
     @Operation(
             summary = "Görev durum geçmişini getir",
-            description = "Belirtilen görevin durum değişiklik geçmişini getirir.")
-    
+            description = "Belirtilen görevin durum değişiklik geçmişini getirir."
+    )
     @GetMapping("/tasks/{id}/status-history")
     public ResponseEntity<List<TaskStatusHistoryResponse>> getTaskStatusHistory(
             @PathVariable Long id,
@@ -201,5 +194,29 @@ public class TaskController {
         return ResponseEntity.ok(
                 taskService.removeLabelFromTask(id, labelId, authentication)
         );
+    }
+
+    @Operation(
+            summary = "Görevin alt görevlerini listele",
+            description = "Belirtilen görevin alt görevlerini (subtask) listeler."
+    )
+    @GetMapping("/tasks/{id}/subtasks")
+    public ResponseEntity<List<TaskResponse>> getSubtasks(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(taskService.getSubtasks(id, authentication));
+    }
+
+    @Operation(
+            summary = "Süresi geçmiş görevleri listele",
+            description = "Bir projede son teslim tarihi geçmiş ve DONE durumunda olmayan görevleri listeler."
+    )
+    @GetMapping("/projects/{projectId}/tasks/overdue")
+    public ResponseEntity<List<TaskResponse>> getOverdueTasks(
+            @PathVariable Long projectId,
+            Authentication authentication) {
+
+        return ResponseEntity.ok(taskService.getOverdueTasks(projectId, authentication));
     }
 }

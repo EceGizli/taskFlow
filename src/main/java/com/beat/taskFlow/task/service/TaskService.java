@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +107,13 @@ public class TaskService {
         if (request.parentTaskId() != null) {
             parentTask = taskRepository.findById(request.parentTaskId())
                     .orElseThrow(() -> new NotFoundException("Üst görev bulunamadı! ID: " + request.parentTaskId()));
+
+            if (!parentTask.getProject().getId().equals(projectId)) {
+                throw new IllegalArgumentException(
+                        "Üst görev, görevin oluşturulacağı projeyle aynı projeye ait değil. Üst görev projesi: "
+                                + parentTask.getProject().getId() + ", hedef proje: " + projectId
+                );
+            }
         }
 
         Task task = Task.builder()
@@ -139,11 +147,12 @@ public class TaskService {
             Long assigneeId,
             LocalDate dueDate,
             Long labelId,
+            String search,
             Pageable pageable,
             Authentication authentication) {
 
         User currentUser = getCurrentUser(authentication);
-        Project project = projectRepository.findById(projectId)
+        Project project = projectRepository.findByIdAndIsDeletedFalse(projectId)
                 .orElseThrow(() -> new NotFoundException("Proje bulunamadı! ID: " + projectId));
 
         validateProjectAccess(project, currentUser);
@@ -151,6 +160,7 @@ public class TaskService {
         Specification<Task> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("project").get("id"), projectId));
+            predicates.add(cb.isFalse(root.get("isDeleted")));
 
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
@@ -168,6 +178,13 @@ public class TaskService {
                 Join<Task, Label> labelJoin = root.join("labels");
                 predicates.add(cb.equal(labelJoin.get("id"), labelId));
             }
+            if (search != null && !search.trim().isEmpty()) {
+                String searchPattern = "%" + search.trim().toLowerCase() + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("title")), searchPattern),
+                        cb.like(cb.lower(root.get("description")), searchPattern)
+                ));
+            }
 
             query.distinct(true);
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -179,8 +196,8 @@ public class TaskService {
     @Transactional(readOnly = true)
     public TaskResponse getTaskById(Long id, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-        Task task = taskRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
+        Task task = taskRepository.findByIdAndIsDeletedFalse(id)
+        		.orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
         validateTaskAccess(task, currentUser);
         return mapToResponse(task);
@@ -299,11 +316,14 @@ public class TaskService {
     @Transactional
     public void deleteTask(Long id, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-        Task task = taskRepository.findById(id)
+        Task task = taskRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
         validateTaskAccess(task, currentUser);
-        taskRepository.delete(task);
+
+        task.setDeleted(true);
+        task.setDeletedAt(LocalDateTime.now());
+        taskRepository.save(task);
     }
 
     @Transactional(readOnly = true)
@@ -392,6 +412,41 @@ public class TaskService {
         task.getLabels().remove(label);
         Task updatedTask = taskRepository.save(task);
         return mapToResponse(updatedTask);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<TaskResponse> getSubtasks(Long taskId, Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+
+        Task parentTask = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + taskId));
+
+        validateTaskAccess(parentTask, currentUser);
+
+        return taskRepository.findByParentTask(parentTask)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponse> getOverdueTasks(Long projectId, Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Proje bulunamadı! ID: " + projectId));
+
+        validateProjectAccess(project, currentUser);
+
+        LocalDate today = LocalDate.now();
+
+        return taskRepository.findByProject(project)
+                .stream()
+                .filter(task -> task.getDueDate() != null
+                        && task.getDueDate().isBefore(today)
+                        && task.getStatus() != TaskStatus.DONE)
+                .map(this::mapToResponse)
+                .toList();
     }
 
     private TaskResponse mapToResponse(Task task) {
