@@ -1,5 +1,10 @@
 package com.beat.taskFlow.task.service;
 
+import java.util.List;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.project.entity.concretes.Project;
 import com.beat.taskFlow.task.dto.requests.CreateCheckItemRequest;
@@ -12,12 +17,6 @@ import com.beat.taskFlow.task.repository.TaskRepository;
 import com.beat.taskFlow.user.entity.concretes.User;
 import com.beat.taskFlow.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -29,31 +28,26 @@ public class CheckItemService {
 
     @Transactional
     public CheckItemResponse createCheckItem(Long taskId, CreateCheckItemRequest request, Authentication authentication) {
-        User currentUser = getCurrentUser(authentication);
-        Task task = taskRepository.findByIdAndIsDeletedFalse(taskId)
-                .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + taskId));
-
-        validateTaskAccess(task, currentUser);
+        User user = getUser(authentication);
+        Task task = getTaskById(taskId);
+        checkProjectAccess(task.getProject(), user);
 
         CheckItem checkItem = CheckItem.builder()
-                .title(request.title().trim())
+                .title(request.title())
                 .isCompleted(false)
                 .task(task)
                 .build();
 
-        CheckItem saved = checkItemRepository.save(checkItem);
-        return mapToResponse(saved);
+        return mapToResponse(checkItemRepository.save(checkItem));
     }
 
     @Transactional(readOnly = true)
     public List<CheckItemResponse> getCheckItemsByTaskId(Long taskId, Authentication authentication) {
-        User currentUser = getCurrentUser(authentication);
-        Task task = taskRepository.findByIdAndIsDeletedFalse(taskId)
-                .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + taskId));
+        User user = getUser(authentication);
+        Task task = getTaskById(taskId);
+        checkProjectAccess(task.getProject(), user);
 
-        validateTaskAccess(task, currentUser);
-
-        return checkItemRepository.findByTaskOrderByIdAsc(task)
+        return checkItemRepository.findByTaskIdOrderByIdAsc(taskId)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -61,71 +55,71 @@ public class CheckItemService {
 
     @Transactional
     public CheckItemResponse updateCheckItem(Long checkItemId, UpdateCheckItemRequest request, Authentication authentication) {
-        User currentUser = getCurrentUser(authentication);
-        CheckItem checkItem = checkItemRepository.findById(checkItemId)
-                .orElseThrow(() -> new NotFoundException("Kontrol maddesi bulunamadı! ID: " + checkItemId));
+        User user = getUser(authentication);
+        CheckItem checkItem = getCheckItemById(checkItemId);
+        checkProjectAccess(checkItem.getTask().getProject(), user);
 
-        validateTaskAccess(checkItem.getTask(), currentUser);
-
-        if (request.title() != null && !request.title().trim().isEmpty()) {
-            checkItem.setTitle(request.title().trim());
+        if (request.title() != null && !request.title().isBlank()) {
+            checkItem.setTitle(request.title());
         }
         if (request.isCompleted() != null) {
             checkItem.setCompleted(request.isCompleted());
         }
 
-        CheckItem updated = checkItemRepository.save(checkItem);
-        return mapToResponse(updated);
+        return mapToResponse(checkItemRepository.save(checkItem));
     }
 
     @Transactional
     public CheckItemResponse toggleCheckItem(Long checkItemId, Authentication authentication) {
-        User currentUser = getCurrentUser(authentication);
-        CheckItem checkItem = checkItemRepository.findById(checkItemId)
-                .orElseThrow(() -> new NotFoundException("Kontrol maddesi bulunamadı! ID: " + checkItemId));
-
-        validateTaskAccess(checkItem.getTask(), currentUser);
+        User user = getUser(authentication);
+        CheckItem checkItem = getCheckItemById(checkItemId);
+        checkProjectAccess(checkItem.getTask().getProject(), user);
 
         checkItem.setCompleted(!checkItem.isCompleted());
-        CheckItem updated = checkItemRepository.save(checkItem);
-        return mapToResponse(updated);
+        return mapToResponse(checkItemRepository.save(checkItem));
     }
 
     @Transactional
     public void deleteCheckItem(Long checkItemId, Authentication authentication) {
-        User currentUser = getCurrentUser(authentication);
-        CheckItem checkItem = checkItemRepository.findById(checkItemId)
-                .orElseThrow(() -> new NotFoundException("Kontrol maddesi bulunamadı! ID: " + checkItemId));
-
-        validateTaskAccess(checkItem.getTask(), currentUser);
+        User user = getUser(authentication);
+        CheckItem checkItem = getCheckItemById(checkItemId);
+        checkProjectAccess(checkItem.getTask().getProject(), user);
 
         checkItemRepository.delete(checkItem);
     }
 
-    private void validateTaskAccess(Task task, User user) {
-        Project project = task.getProject();
+    private void checkProjectAccess(Project project, User user) {
         boolean isOwner = project.getOwner().getId().equals(user.getId());
-        boolean isMember = project.getMembers().stream().anyMatch(m -> m.getId().equals(user.getId()));
+        boolean isMember = project.getMembers() != null && project.getMembers().contains(user);
 
         if (!isOwner && !isMember) {
-            throw new AccessDeniedException("Bu göreve erişim yetkiniz yok!");
+            throw new AccessDeniedException("Bu projeye erişim yetkiniz yok.");
         }
     }
 
-    private User getCurrentUser(Authentication authentication) {
-        String email = authentication.getName();
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Giriş yapan kullanıcı bulunamadı!"));
+    private User getUser(Authentication authentication) {
+        return userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı."));
     }
 
-    private CheckItemResponse mapToResponse(CheckItem item) {
+    private Task getTaskById(Long taskId) {
+        return taskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı."));
+    }
+
+    private CheckItem getCheckItemById(Long checkItemId) {
+        return checkItemRepository.findById(checkItemId)
+                .orElseThrow(() -> new NotFoundException("Kontrol maddesi bulunamadı."));
+    }
+
+    private CheckItemResponse mapToResponse(CheckItem checkItem) {
         return new CheckItemResponse(
-                item.getId(),
-                item.getTitle(),
-                item.isCompleted(),
-                item.getTask().getId(),
-                item.getCreatedAt(),
-                item.getUpdatedAt()
+                checkItem.getId(),
+                checkItem.getTitle(),
+                checkItem.isCompleted(),
+                checkItem.getTask().getId(),
+                checkItem.getCreatedAt(),
+                checkItem.getUpdatedAt()
         );
     }
 }
