@@ -6,6 +6,7 @@ import com.beat.taskFlow.comment.dto.responses.CommentResponse;
 import com.beat.taskFlow.comment.entity.Comment;
 import com.beat.taskFlow.comment.repository.CommentRepository;
 import com.beat.taskFlow.common.exception.NotFoundException;
+import com.beat.taskFlow.notification.service.NotificationService;
 import com.beat.taskFlow.project.entity.concretes.Project;
 import com.beat.taskFlow.task.entity.concretes.Task;
 import com.beat.taskFlow.task.repository.TaskRepository;
@@ -26,6 +27,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     private User getCurrentUser(Authentication authentication) {
 
@@ -63,6 +65,14 @@ public class CommentService {
                 .build();
 
         Comment savedComment = commentRepository.save(comment);
+
+        if (task.getAssignee() != null && !task.getAssignee().getId().equals(currentUser.getId())) {
+            notificationService.createNotification(
+                    task.getAssignee(),
+                    "Görevinize Yeni Yorum Yapıldı",
+                    "\"" + task.getTitle() + "\" başlıklı görevinize yeni bir yorum eklendi."
+            );
+        }
 
         return mapToResponse(savedComment);
     }

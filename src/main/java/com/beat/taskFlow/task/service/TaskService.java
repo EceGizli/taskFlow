@@ -6,8 +6,12 @@ import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.label.dto.responses.LabelResponse;
 import com.beat.taskFlow.label.entity.Label;
 import com.beat.taskFlow.label.repository.LabelRepository;
+import com.beat.taskFlow.notification.service.NotificationService;
 import com.beat.taskFlow.project.dto.responses.ProjectStatsResponse;
 import com.beat.taskFlow.project.entity.concretes.Project;
+import com.beat.taskFlow.project.entity.concretes.ProjectMember;
+import com.beat.taskFlow.project.entity.enums.ProjectRole;
+import com.beat.taskFlow.project.repository.ProjectMemberRepository;
 import com.beat.taskFlow.project.repository.ProjectRepository;
 import com.beat.taskFlow.task.dto.requests.*;
 import com.beat.taskFlow.task.dto.responses.TaskResponse;
@@ -47,6 +51,8 @@ public class TaskService {
     private final UserRepository userRepository;
     private final TaskStatusHistoryRepository taskStatusHistoryRepository;
     private final LabelRepository labelRepository;
+    private final NotificationService notificationService;
+    private final ProjectMemberRepository projectMemberRepository;
 
     private User getCurrentUser(Authentication authentication) {
         String email = authentication.getName();
@@ -60,6 +66,21 @@ public class TaskService {
 
         if (!isOwner && !isMember) {
             throw new AccessDeniedException("Bu projeye erişim yetkiniz bulunmamaktadır!");
+        }
+    }
+
+    public void validateTaskModificationAccess(Project project, User user) {
+        if (project.getOwner() != null && project.getOwner().getId() != null && user != null && user.getId() != null) {
+            if (project.getOwner().getId().equals(user.getId())) {
+                return; 
+            }
+        }
+
+        ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(project.getId(), user.getId())
+                .orElseThrow(() -> new AccessDeniedException("Bu projeye erişim yetkiniz bulunmamaktadır."));
+
+        if (member.getRole() == ProjectRole.VIEWER) {
+            throw new AccessDeniedException("VIEWER rolündeki üyeler görevlerde değişiklik yapamaz.");
         }
     }
 
@@ -310,9 +331,18 @@ public class TaskService {
         }
 
         Task updatedTask = taskRepository.save(task);
+
+        if (updatedTask.getAssignee() != null && !updatedTask.getAssignee().getId().equals(currentUser.getId())) {
+            notificationService.createNotification(
+                    updatedTask.getAssignee(),
+                    "Yeni Görev Atandı",
+                    "\"" + updatedTask.getTitle() + "\" başlıklı görev size atandı."
+            );
+        }
+
         return mapToResponse(updatedTask);
     }
-
+    
     @Transactional
     public void deleteTask(Long id, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
