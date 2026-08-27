@@ -6326,6 +6326,136 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "UploadFile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_secret_10k0}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "uuid": "90139cc0-a36e-4baf-81cf-87ffd9119945",
+                  "src": "/C:/Users/Su/OneDrive - Bingöl Üniversitesi/Masaüstü/TaskFlow_Staj_Projesi_Kilavuzu.pdf"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/14/attachments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "14",
+                "attachments"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DosyaEkleriniListeleme",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{json_web_token_10k0}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/14/attachments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "tasks",
+                "14",
+                "attachments"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DownloadFile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supabase_service_role_api_key_10k0}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/attachments/1/download",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "attachments",
+                "1",
+                "download"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DeleteAttachment",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{supabase_service_role_api_key_10k0}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/attachments/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "attachments",
+                "1"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }
@@ -6585,6 +6715,18 @@
     },
     {
       "key": "auth_secret_0jqz",
+      "secret": true
+    },
+    {
+      "key": "auth_secret_10k0",
+      "secret": true
+    },
+    {
+      "key": "json_web_token_10k0",
+      "secret": true
+    },
+    {
+      "key": "supabase_service_role_api_key_10k0",
       "secret": true
     }
   ]
