@@ -13,6 +13,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import com.beat.taskFlow.common.exception.AccountLockedException;
 import com.beat.taskFlow.common.exception.AlreadyExistsException;
 import com.beat.taskFlow.common.exception.EmailSendingException;
@@ -118,6 +120,18 @@ public class GlobalExceptionHandler {
             HttpMessageNotReadableException ex,
             HttpServletRequest request) {
         return buildResponse(HttpStatus.BAD_REQUEST, "Bad Request", "İstek gövdesi okunamadı. Lütfen geçerli bir JSON formatı gönderin.", request);
+    }
+    
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException ex,
+            HttpServletRequest request) {
+        return buildResponse(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "Payload Too Large",
+                "Dosya boyutu 10 MB sınırını aşamaz.",
+                request
+        );
     }
 
     @ExceptionHandler(Exception.class)

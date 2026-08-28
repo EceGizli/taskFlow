@@ -57,8 +57,7 @@ class TaskServiceStatusTest {
 
         when(authentication.getName()).thenReturn(user.getEmail());
         when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-        when(taskRepository.findById(100L)).thenReturn(Optional.of(task));
-
+        when(taskRepository.findByIdAndIsDeletedFalse(100L)).thenReturn(Optional.of(task));
         assertThatThrownBy(() ->
                 taskService.updateTaskStatus(100L, new UpdateTaskStatusRequest(TaskStatus.DONE), authentication)
         ).isInstanceOf(InvalidTaskStatusException.class);

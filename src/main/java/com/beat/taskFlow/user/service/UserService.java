@@ -120,4 +120,12 @@ public class UserService {
                 user.getCreatedAt()
         );
     }
+    
+    @Transactional
+    public void logout(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("Kullanıcı bulunamadı"));
+
+        refreshTokenService.revokeAllTokensForUser(user);
+    }
 }

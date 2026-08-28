@@ -1,6 +1,5 @@
 package com.beat.taskFlow.notification.controller;
 
-import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.beat.taskFlow.notification.dto.responses.NotificationResponse;
 import com.beat.taskFlow.notification.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,6 +22,7 @@ import org.springframework.data.web.PageableDefault;
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
 @Tag(name = "Notifications", description = "Kullanıcı bildirimleri uç noktaları")
+@SecurityRequirement(name = "bearerAuth")
 public class NotificationController {
 
     private final NotificationService notificationService;
@@ -38,5 +39,18 @@ public class NotificationController {
     @Operation(summary = "Bildirimi okundu olarak işaretle")
     public ResponseEntity<NotificationResponse> markAsRead(@PathVariable Long id, Authentication authentication) {
         return ResponseEntity.ok(notificationService.markAsRead(id, authentication));
+    }
+    
+    @GetMapping("/unread-count")
+    @Operation(summary = "Okunmamış bildirim sayısını getir")
+    public ResponseEntity<Long> getUnreadCount(Authentication authentication) {
+        return ResponseEntity.ok(notificationService.getUnreadCount(authentication));
+    }
+
+    @PatchMapping("/read-all")
+    @Operation(summary = "Tüm bildirimleri okundu olarak işaretle")
+    public ResponseEntity<Void> markAllAsRead(Authentication authentication) {
+        notificationService.markAllAsRead(authentication);
+        return ResponseEntity.noContent().build();
     }
 }

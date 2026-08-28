@@ -77,6 +77,19 @@ public class TaskController {
 
         return ResponseEntity.ok(taskService.getTaskById(id, authentication));
     }
+    
+    @Operation(
+            summary = "Görevi kopyala",
+            description = "Belirtilen görevin yeni bir kopyasını oluşturur."
+    )
+    @PostMapping("/tasks/{id}/duplicate")
+    public ResponseEntity<TaskResponse> duplicateTask(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(taskService.duplicateTask(id, authentication));
+    }
 
     @Operation(
             summary = "Görevi güncelle",

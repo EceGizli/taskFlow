@@ -20,6 +20,7 @@ import com.beat.taskFlow.task.entity.concretes.Task;
 import com.beat.taskFlow.task.entity.concretes.TaskStatusHistory;
 import com.beat.taskFlow.task.entity.enums.Priority;
 import com.beat.taskFlow.task.entity.enums.TaskStatus;
+import com.beat.taskFlow.task.repository.CheckItemRepository;
 import com.beat.taskFlow.task.repository.TaskRepository;
 import com.beat.taskFlow.task.repository.TaskStatusHistoryRepository;
 import com.beat.taskFlow.user.entity.concretes.User;
@@ -34,7 +35,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.beat.taskFlow.task.entity.concretes.CheckItem;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -53,6 +54,7 @@ public class TaskService {
     private final LabelRepository labelRepository;
     private final NotificationService notificationService;
     private final ProjectMemberRepository projectMemberRepository;
+    private final CheckItemRepository checkItemRepository;
 
     private User getCurrentUser(Authentication authentication) {
         String email = authentication.getName();
@@ -109,8 +111,7 @@ public class TaskService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Proje bulunamadı! ID: " + projectId));
 
-        validateProjectAccess(project, currentUser);
-
+        validateTaskModificationAccess(project, currentUser);
         User assignee = null;
         if (request.assigneeId() != null) {
             assignee = userRepository.findById(request.assigneeId())
@@ -155,6 +156,56 @@ public class TaskService {
                 .task(savedTask)
                 .status(savedTask.getStatus())
                 .build();
+        taskStatusHistoryRepository.save(history);
+
+        return mapToResponse(savedTask);
+    }
+    
+    @Transactional
+    public TaskResponse duplicateTask(Long id, Authentication authentication) {
+        User currentUser = getCurrentUser(authentication);
+
+        Task originalTask = taskRepository.findByIdAndIsDeletedFalse(id)
+                .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
+
+        validateTaskModificationAccess(originalTask.getProject(), currentUser);
+
+        Task duplicatedTask = Task.builder()
+                .title(originalTask.getTitle() + " (Kopya)")
+                .description(originalTask.getDescription())
+                .status(TaskStatus.TODO)
+                .priority(originalTask.getPriority())
+                .dueDate(originalTask.getDueDate())
+                .estimatedHours(originalTask.getEstimatedHours())
+                .project(originalTask.getProject())
+                .assignee(originalTask.getAssignee())
+                .parentTask(null)
+                .build();
+
+        if (originalTask.getLabels() != null) {
+            duplicatedTask.getLabels().addAll(originalTask.getLabels());
+        }
+
+        Task savedTask = taskRepository.save(duplicatedTask);
+        
+        List<CheckItem> originalCheckItems =
+                checkItemRepository.findByTaskOrderByIdAsc(originalTask);
+
+        List<CheckItem> duplicatedCheckItems = originalCheckItems.stream()
+                .map(checkItem -> CheckItem.builder()
+                        .title(checkItem.getTitle())
+                        .isCompleted(false)
+                        .task(savedTask)
+                        .build())
+                .toList();
+
+        checkItemRepository.saveAll(duplicatedCheckItems);
+
+        TaskStatusHistory history = TaskStatusHistory.builder()
+                .task(savedTask)
+                .status(savedTask.getStatus())
+                .build();
+
         taskStatusHistoryRepository.save(history);
 
         return mapToResponse(savedTask);
@@ -227,11 +278,11 @@ public class TaskService {
     @Transactional
     public TaskResponse updateTask(Long id, UpdateTaskRequest request, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-        Task task = taskRepository.findById(id)
+        Task task = taskRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
-        validateTaskAccess(task, currentUser);
-
+        validateTaskModificationAccess(task.getProject(), currentUser);
+        
         task.setTitle(request.title());
         task.setDescription(request.description());
         task.setPriority(request.priority());
@@ -245,11 +296,11 @@ public class TaskService {
     @Transactional
     public TaskResponse updateTaskStatus(Long id, UpdateTaskStatusRequest request, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-        Task task = taskRepository.findById(id)
+        Task task = taskRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
-        validateTaskAccess(task, currentUser);
-
+        validateTaskModificationAccess(task.getProject(), currentUser);
+        
         if (task.getStatus() == request.status()) {
             return mapToResponse(task);
         }
@@ -275,10 +326,10 @@ public class TaskService {
         List<TaskStatusHistory> histories = new ArrayList<>();
 
         for (Long id : request.taskIds()) {
-            Task task = taskRepository.findById(id)
-                    .orElseThrow(() -> new NotFoundException("Toplu güncelleme sırasında görev bulunamadı. id = " + id));
+        	Task task = taskRepository.findByIdAndIsDeletedFalse(id)
+        	        .orElseThrow(() -> new NotFoundException("Toplu güncelleme sırasında görev bulunamadı. id = " + id));
 
-            validateTaskAccess(task, currentUser);
+            validateTaskModificationAccess(task.getProject(), currentUser);
             validateStatusTransition(task.getStatus(), request.status());
 
             if (task.getStatus() == request.status()) {
@@ -309,11 +360,11 @@ public class TaskService {
     @Transactional
     public TaskResponse updateTaskAssignee(Long id, UpdateTaskAssigneeRequest request, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-        Task task = taskRepository.findById(id)
+        Task task = taskRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
-        validateTaskAccess(task, currentUser);
-
+        validateTaskModificationAccess(task.getProject(), currentUser);
+        
         if (request.assigneeId() == null) {
             task.setAssignee(null);
         } else {
@@ -349,8 +400,8 @@ public class TaskService {
         Task task = taskRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + id));
 
-        validateTaskAccess(task, currentUser);
-
+        validateTaskModificationAccess(task.getProject(), currentUser);
+        
         task.setDeleted(true);
         task.setDeletedAt(LocalDateTime.now());
         taskRepository.save(task);
@@ -359,7 +410,7 @@ public class TaskService {
     @Transactional(readOnly = true)
     public List<TaskResponse> getTasksAssignedToMe(Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-        return taskRepository.findByAssignee(currentUser).stream()
+        return taskRepository.findByAssigneeAndIsDeletedFalse(currentUser).stream()
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -407,11 +458,11 @@ public class TaskService {
     @Transactional
     public TaskResponse addLabelToTask(Long taskId, Long labelId, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
-        Task task = taskRepository.findById(taskId)
+        Task task = taskRepository.findByIdAndIsDeletedFalse(taskId)
                 .orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + taskId));
 
-        validateTaskAccess(task, currentUser);
-
+        validateTaskModificationAccess(task.getProject(), currentUser);
+        
         Label label = labelRepository.findById(labelId)
                 .orElseThrow(() -> new NotFoundException("Etiket bulunamadı. id = " + labelId));
 
@@ -426,21 +477,25 @@ public class TaskService {
 
     @Transactional
     public TaskResponse removeLabelFromTask(Long taskId, Long labelId, Authentication authentication) {
+
         User currentUser = getCurrentUser(authentication);
-        Task task = taskRepository.findById(taskId)
+
+        Task task = taskRepository.findByIdAndIsDeletedFalse(taskId)
                 .orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + taskId));
 
-        validateTaskAccess(task, currentUser);
+        validateTaskModificationAccess(task.getProject(), currentUser);
 
         Label label = labelRepository.findById(labelId)
                 .orElseThrow(() -> new NotFoundException("Etiket bulunamadı. id = " + labelId));
 
         if (!task.getLabels().contains(label)) {
-            throw new NotFoundException("Etiket bu görevde bulunamadı.");
+            throw new NotFoundException("Bu etiket görevde bulunmuyor.");
         }
 
         task.getLabels().remove(label);
+
         Task updatedTask = taskRepository.save(task);
+
         return mapToResponse(updatedTask);
     }
     
@@ -448,12 +503,12 @@ public class TaskService {
     public List<TaskResponse> getSubtasks(Long taskId, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
 
-        Task parentTask = taskRepository.findById(taskId)
+        Task parentTask = taskRepository.findByIdAndIsDeletedFalse(taskId)
                 .orElseThrow(() -> new NotFoundException("Görev bulunamadı! ID: " + taskId));
 
         validateTaskAccess(parentTask, currentUser);
 
-        return taskRepository.findByParentTask(parentTask)
+        return taskRepository.findByParentTaskAndIsDeletedFalse(parentTask)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -463,14 +518,14 @@ public class TaskService {
     public List<TaskResponse> getOverdueTasks(Long projectId, Authentication authentication) {
         User currentUser = getCurrentUser(authentication);
 
-        Project project = projectRepository.findById(projectId)
+        Project project = projectRepository.findByIdAndIsDeletedFalse(projectId)
                 .orElseThrow(() -> new NotFoundException("Proje bulunamadı! ID: " + projectId));
 
         validateProjectAccess(project, currentUser);
 
         LocalDate today = LocalDate.now();
 
-        return taskRepository.findByProject(project)
+        return taskRepository.findByProjectAndIsDeletedFalse(project)
                 .stream()
                 .filter(task -> task.getDueDate() != null
                         && task.getDueDate().isBefore(today)

@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import com.beat.taskFlow.user.service.RefreshTokenService;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -84,5 +85,18 @@ public class AuthController {
         return ResponseEntity.ok(
                 "Şifreniz başarıyla güncellendi. Yeni şifrenizle giriş yapabilirsiniz."
         );
+    }
+    
+    @Operation(
+            summary = "Çıkış yap",
+            description = "Kullanıcının aktif refresh tokenlarını geçersiz hale getirir."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/logout")
+    public ResponseEntity<String> logout(Authentication authentication) {
+
+        userService.logout(authentication.getName());
+
+        return ResponseEntity.ok("Başarıyla çıkış yapıldı.");
     }
 }

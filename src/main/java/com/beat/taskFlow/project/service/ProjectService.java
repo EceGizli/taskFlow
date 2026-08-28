@@ -24,7 +24,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -55,8 +54,14 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProjectResponse> getAllProjects(Authentication authentication, ProjectStatus status, String tag, String search) {
+    public List<ProjectResponse> getAllProjects(
+            Authentication authentication,
+            ProjectStatus status,
+            String search,
+            String sort) {
+
         User currentUser = getCurrentUser(authentication);
+
         List<Project> projects;
 
         if (search != null && !search.trim().isEmpty()) {
@@ -67,7 +72,21 @@ public class ProjectService {
 
         return projects.stream()
                 .filter(p -> status == null || p.getStatus() == status)
-                .filter(p -> tag == null || (p.getTag() != null && p.getTag().equalsIgnoreCase(tag)))
+                .sorted((p1, p2) -> {
+                    if (sort == null || sort.isBlank()) {
+                        return 0;
+                    }
+
+                    if ("createdAt,asc".equalsIgnoreCase(sort)) {
+                        return p1.getCreatedAt().compareTo(p2.getCreatedAt());
+                    }
+
+                    if ("createdAt,desc".equalsIgnoreCase(sort)) {
+                        return p2.getCreatedAt().compareTo(p1.getCreatedAt());
+                    }
+
+                    return 0;
+                })
                 .map(this::convertToResponse)
                 .toList();
     }

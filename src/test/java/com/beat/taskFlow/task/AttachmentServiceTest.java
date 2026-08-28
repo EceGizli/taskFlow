@@ -182,4 +182,53 @@ class AttachmentServiceTest {
                 attachmentService.deleteAttachment(99L, authentication)
         );
     }
+    
+    @Test
+    void uploadFile_UnsupportedFileType_ThrowsException() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "malicious.exe",
+                "application/x-msdownload",
+                "test".getBytes()
+        );
+
+        when(authentication.getName()).thenReturn(user.getEmail());
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                attachmentService.uploadFile(1L, file, authentication)
+        );
+
+        verify(attachmentRepository, org.mockito.Mockito.never())
+                .save(any(Attachment.class));
+    }
+    
+    @Test
+    void uploadFile_AllowedFileType_Success() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "image.png",
+                "image/png",
+                "test image".getBytes()
+        );
+
+        when(authentication.getName()).thenReturn(user.getEmail());
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(attachmentRepository.save(any(Attachment.class))).thenAnswer(inv -> {
+            Attachment a = inv.getArgument(0);
+            a.setId(11L);
+            return a;
+        });
+
+        AttachmentResponse response =
+                attachmentService.uploadFile(1L, file, authentication);
+
+        assertNotNull(response);
+        assertEquals("image.png", response.fileName());
+        assertEquals("image/png", response.fileType());
+
+        verify(attachmentRepository).save(any(Attachment.class));
+    }
 }

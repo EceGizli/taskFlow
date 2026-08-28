@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.beat.taskFlow.user.service.RefreshTokenService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +26,7 @@ public class PasswordResetService {
     private final PasswordResetTokenRepository tokenRepository;
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
     @Value("${app.security.password-reset-expiration:15}")
     private long expirationMinutes;
@@ -97,6 +98,8 @@ public class PasswordResetService {
         );
 
         userRepository.save(user);
+        
+        refreshTokenService.revokeAllTokensForUser(user);
 
         resetToken.setUsed(true);
         tokenRepository.save(resetToken);

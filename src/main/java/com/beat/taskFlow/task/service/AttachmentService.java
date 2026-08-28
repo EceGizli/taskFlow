@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -63,11 +64,50 @@ public class AttachmentService {
             throw new IllegalArgumentException("Boş dosya yüklenemez.");
         }
 
-        String originalFileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "unnamed";
+        String originalFileName = file.getOriginalFilename() != null
+                ? file.getOriginalFilename()
+                : "unnamed";
+
         String fileExtension = "";
+
         int dotIndex = originalFileName.lastIndexOf('.');
+
         if (dotIndex > 0) {
             fileExtension = originalFileName.substring(dotIndex);
+        }
+
+        Set<String> allowedExtensions = Set.of(
+                ".pdf",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".txt",
+                ".doc",
+                ".docx",
+                ".xls",
+                ".xlsx"
+        );
+
+        Set<String> allowedContentTypes = Set.of(
+                "application/pdf",
+                "image/png",
+                "image/jpeg",
+                "text/plain",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+
+        String contentType = file.getContentType();
+
+        if (!allowedExtensions.contains(fileExtension.toLowerCase())
+                || contentType == null
+                || !allowedContentTypes.contains(contentType)) {
+
+            throw new IllegalArgumentException(
+                    "Desteklenmeyen dosya türü."
+            );
         }
 
         String storedFileName = UUID.randomUUID().toString() + fileExtension;

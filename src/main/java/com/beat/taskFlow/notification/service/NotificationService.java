@@ -1,6 +1,5 @@
 package com.beat.taskFlow.notification.service;
 
-import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -35,7 +34,6 @@ public class NotificationService {
     }
 
 
-
     @Transactional(readOnly = true)
     public Page<NotificationResponse> getMyNotifications(Authentication authentication, Pageable pageable) {
         User user = getCurrentUser(authentication);
@@ -55,6 +53,20 @@ public class NotificationService {
 
         notification.setRead(true);
         return toResponse(notificationRepository.save(notification));
+    }
+    
+    @Transactional(readOnly = true)
+    public long getUnreadCount(Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        return notificationRepository.countByUserIdAndIsReadFalse(user.getId());
+    }
+
+    @Transactional
+    public void markAllAsRead(Authentication authentication) {
+        User user = getCurrentUser(authentication);
+
+        notificationRepository.findByUserIdAndIsReadFalse(user.getId())
+                .forEach(notification -> notification.setRead(true));
     }
 
     private User getCurrentUser(Authentication authentication) {
