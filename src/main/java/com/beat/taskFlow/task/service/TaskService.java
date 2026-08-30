@@ -442,7 +442,7 @@ public class TaskService {
 
         validateProjectAccess(project, currentUser);
 
-        List<Task> tasks = taskRepository.findByProject(project);
+        List<Task> tasks = taskRepository.findByProjectAndIsDeletedFalse(project);
 
         long totalTasks = tasks.size();
         Map<TaskStatus, Long> countsByStatus = tasks.stream()

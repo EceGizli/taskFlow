@@ -8,6 +8,9 @@ import com.beat.taskFlow.comment.repository.CommentRepository;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.notification.service.NotificationService;
 import com.beat.taskFlow.project.entity.concretes.Project;
+import com.beat.taskFlow.project.entity.concretes.ProjectMember;
+import com.beat.taskFlow.project.entity.enums.ProjectRole;
+import com.beat.taskFlow.project.repository.ProjectMemberRepository;
 import com.beat.taskFlow.task.entity.concretes.Task;
 import com.beat.taskFlow.task.repository.TaskRepository;
 import com.beat.taskFlow.user.entity.concretes.User;
@@ -28,6 +31,7 @@ public class CommentService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final ProjectMemberRepository projectMemberRepository;
 
     private User getCurrentUser(Authentication authentication) {
 
@@ -49,6 +53,19 @@ public class CommentService {
         }
     }
 
+    private void validateCommentWriteAccess(Project project, User user) {
+        if (project.getOwner() != null && project.getOwner().getId().equals(user.getId())) {
+            return;
+        }
+
+        ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(project.getId(), user.getId())
+                .orElseThrow(() -> new AccessDeniedException("Bu projeye erişim yetkiniz bulunmamaktadır."));
+
+        if (member.getRole() == ProjectRole.VIEWER) {
+            throw new AccessDeniedException("VIEWER rolündeki üyeler yorum ekleyemez.");
+        }
+    }
+
     @Transactional
     public CommentResponse createComment(Long taskId, CreateCommentRequest request, Authentication authentication) {
 
@@ -56,7 +73,7 @@ public class CommentService {
 
         Task task = taskRepository.findById(taskId).orElseThrow(() -> new NotFoundException("Görev bulunamadı. id = " + taskId));
 
-        validateTaskAccess(task, currentUser);
+        validateCommentWriteAccess(task.getProject(), currentUser);
 
         Comment comment = Comment.builder()
                 .content(request.content())

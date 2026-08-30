@@ -7,6 +7,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.project.entity.concretes.Project;
+import com.beat.taskFlow.project.entity.concretes.ProjectMember;
+import com.beat.taskFlow.project.entity.enums.ProjectRole;
+import com.beat.taskFlow.project.repository.ProjectMemberRepository;
 import com.beat.taskFlow.task.dto.requests.CreateCheckItemRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateCheckItemRequest;
 import com.beat.taskFlow.task.dto.responses.CheckItemResponse;
@@ -25,12 +28,13 @@ public class CheckItemService {
     private final CheckItemRepository checkItemRepository;
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
+    private final ProjectMemberRepository projectMemberRepository;
 
     @Transactional
     public CheckItemResponse createCheckItem(Long taskId, CreateCheckItemRequest request, Authentication authentication) {
         User user = getUser(authentication);
         Task task = getTaskById(taskId);
-        checkProjectAccess(task.getProject(), user);
+        validateWriteAccess(task.getProject(), user);
 
         CheckItem checkItem = CheckItem.builder()
                 .title(request.title())
@@ -57,7 +61,7 @@ public class CheckItemService {
     public CheckItemResponse updateCheckItem(Long checkItemId, UpdateCheckItemRequest request, Authentication authentication) {
         User user = getUser(authentication);
         CheckItem checkItem = getCheckItemById(checkItemId);
-        checkProjectAccess(checkItem.getTask().getProject(), user);
+        validateWriteAccess(checkItem.getTask().getProject(), user);
 
         if (request.title() != null && !request.title().isBlank()) {
             checkItem.setTitle(request.title());
@@ -73,7 +77,7 @@ public class CheckItemService {
     public CheckItemResponse toggleCheckItem(Long checkItemId, Authentication authentication) {
         User user = getUser(authentication);
         CheckItem checkItem = getCheckItemById(checkItemId);
-        checkProjectAccess(checkItem.getTask().getProject(), user);
+        validateWriteAccess(checkItem.getTask().getProject(), user);
 
         checkItem.setCompleted(!checkItem.isCompleted());
         return mapToResponse(checkItemRepository.save(checkItem));
@@ -83,7 +87,7 @@ public class CheckItemService {
     public void deleteCheckItem(Long checkItemId, Authentication authentication) {
         User user = getUser(authentication);
         CheckItem checkItem = getCheckItemById(checkItemId);
-        checkProjectAccess(checkItem.getTask().getProject(), user);
+        validateWriteAccess(checkItem.getTask().getProject(), user);
 
         checkItemRepository.delete(checkItem);
     }
@@ -94,6 +98,19 @@ public class CheckItemService {
 
         if (!isOwner && !isMember) {
             throw new AccessDeniedException("Bu projeye erişim yetkiniz yok.");
+        }
+    }
+
+    private void validateWriteAccess(Project project, User user) {
+        if (project.getOwner() != null && project.getOwner().getId().equals(user.getId())) {
+            return;
+        }
+
+        ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(project.getId(), user.getId())
+                .orElseThrow(() -> new AccessDeniedException("Bu projeye erişim yetkiniz yok."));
+
+        if (member.getRole() == ProjectRole.VIEWER) {
+            throw new AccessDeniedException("VIEWER rolündeki üyeler checklist üzerinde değişiklik yapamaz.");
         }
     }
 

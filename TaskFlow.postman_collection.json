@@ -2589,7 +2589,7 @@
           "response": []
         },
         {
-          "name": "TarihFiltresiTest",
+          "name": "DueDate Filtresi Testi (tekil tarih eşleşmesi)",
           "request": {
             "auth": {
               "type": "bearer",
@@ -2604,7 +2604,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/projects/12/tasks?startDate=2026-08-01&endDate=2026-08-31&page=0&size=20",
+              "raw": "{{baseUrl}}/api/projects/12/tasks?dueDate=2026-08-15&page=0&size=20",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -2616,12 +2616,8 @@
               ],
               "query": [
                 {
-                  "key": "startDate",
-                  "value": "2026-08-01"
-                },
-                {
-                  "key": "endDate",
-                  "value": "2026-08-31"
+                  "key": "dueDate",
+                  "value": "2026-08-15"
                 },
                 {
                   "key": "page",
@@ -2632,7 +2628,8 @@
                   "value": "20"
                 }
               ]
-            }
+            },
+            "description": "Not: API şu an dueDate icin sadece tekil tarih eslesmesi destekliyor, startDate/endDate araligi desteklenmiyor."
           },
           "response": []
         },
@@ -2857,7 +2854,7 @@
           "response": []
         },
         {
-          "name": "HatalıTarihAralığıTesti",
+          "name": "DueDate Gecersiz Format Testi",
           "request": {
             "auth": {
               "type": "bearer",
@@ -2872,7 +2869,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/projects/12/tasks?startDate=2026-08-31&endDate=2026-08-01",
+              "raw": "{{baseUrl}}/api/projects/12/tasks?dueDate=gecersiz-tarih",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -2884,15 +2881,12 @@
               ],
               "query": [
                 {
-                  "key": "startDate",
-                  "value": "2026-08-31"
-                },
-                {
-                  "key": "endDate",
-                  "value": "2026-08-01"
+                  "key": "dueDate",
+                  "value": "gecersiz-tarih"
                 }
               ]
-            }
+            },
+            "description": "Gecersiz formatli dueDate parametresinin 400 donup donmedigini test eder."
           },
           "response": []
         },
@@ -3219,7 +3213,8 @@
                 "tasks",
                 "overdue"
               ]
-            }
+            },
+            "description": "Overdue endpointi: dueDate'i bugunden onceki, tamamlanmamis gorevleri listeler."
           },
           "response": []
         },

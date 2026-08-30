@@ -24,6 +24,9 @@ import com.beat.taskFlow.comment.service.CommentService;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.notification.service.NotificationService;
 import com.beat.taskFlow.project.entity.concretes.Project;
+import com.beat.taskFlow.project.entity.concretes.ProjectMember;
+import com.beat.taskFlow.project.entity.enums.ProjectRole;
+import com.beat.taskFlow.project.repository.ProjectMemberRepository;
 import com.beat.taskFlow.task.entity.concretes.Task;
 import com.beat.taskFlow.task.repository.TaskRepository;
 import com.beat.taskFlow.user.entity.concretes.User;
@@ -45,6 +48,9 @@ class CommentServiceTest {
     private NotificationService notificationService;
 
     @Mock
+    private ProjectMemberRepository projectMemberRepository;
+
+    @Mock
     private Authentication authentication;
 
     private CommentService commentService;
@@ -59,7 +65,8 @@ class CommentServiceTest {
                 commentRepository,
                 taskRepository,
                 userRepository,
-                notificationService
+                notificationService,
+                projectMemberRepository
         );
 
         user = new User();
@@ -144,6 +151,69 @@ class CommentServiceTest {
         assertThrows(AccessDeniedException.class, () ->
                 commentService.createComment(1L, request, authentication)
         );
+    }
+
+    @Test
+    void createComment_ViewerRole_ThrowsAccessDenied() {
+        User viewerUser = new User();
+        viewerUser.setId(3L);
+        viewerUser.setEmail("viewer@taskflow.com");
+
+        CreateCommentRequest request = new CreateCommentRequest("Yeni yorum");
+
+        when(authentication.getName()).thenReturn(viewerUser.getEmail());
+        when(userRepository.findByEmail(viewerUser.getEmail()))
+                .thenReturn(Optional.of(viewerUser));
+        when(taskRepository.findById(1L))
+                .thenReturn(Optional.of(task));
+        when(projectMemberRepository.findByProjectIdAndUserId(1L, 3L))
+                .thenReturn(Optional.of(
+                        com.beat.taskFlow.project.entity.concretes.ProjectMember.builder()
+                                .project(project)
+                                .user(viewerUser)
+                                .role(com.beat.taskFlow.project.entity.enums.ProjectRole.VIEWER)
+                                .build()
+                ));
+
+        assertThrows(AccessDeniedException.class, () ->
+                commentService.createComment(1L, request, authentication)
+        );
+
+        verify(commentRepository, org.mockito.Mockito.never()).save(any(Comment.class));
+    }
+
+    @Test
+    void createComment_EditorRole_Success() {
+        User editorUser = new User();
+        editorUser.setId(3L);
+        editorUser.setEmail("editor@taskflow.com");
+
+        CreateCommentRequest request = new CreateCommentRequest("Yeni yorum");
+
+        when(authentication.getName()).thenReturn(editorUser.getEmail());
+        when(userRepository.findByEmail(editorUser.getEmail()))
+                .thenReturn(Optional.of(editorUser));
+        when(taskRepository.findById(1L))
+                .thenReturn(Optional.of(task));
+        when(projectMemberRepository.findByProjectIdAndUserId(1L, 3L))
+                .thenReturn(Optional.of(
+                        com.beat.taskFlow.project.entity.concretes.ProjectMember.builder()
+                                .project(project)
+                                .user(editorUser)
+                                .role(com.beat.taskFlow.project.entity.enums.ProjectRole.EDITOR)
+                                .build()
+                ));
+        when(commentRepository.save(any(Comment.class)))
+                .thenAnswer(invocation -> {
+                    Comment saved = invocation.getArgument(0);
+                    saved.setId(11L);
+                    return saved;
+                });
+
+        CommentResponse response = commentService.createComment(1L, request, authentication);
+
+        assertNotNull(response);
+        assertEquals("Yeni yorum", response.content());
     }
 
     @Test

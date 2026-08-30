@@ -22,6 +22,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.project.entity.concretes.Project;
+import com.beat.taskFlow.project.entity.concretes.ProjectMember;
+import com.beat.taskFlow.project.entity.enums.ProjectRole;
+import com.beat.taskFlow.project.repository.ProjectMemberRepository;
 import com.beat.taskFlow.task.dto.responses.AttachmentResponse;
 import com.beat.taskFlow.task.entity.concretes.Attachment;
 import com.beat.taskFlow.task.entity.concretes.Task;
@@ -44,6 +47,9 @@ class AttachmentServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private ProjectMemberRepository projectMemberRepository;
+
+    @Mock
     private Authentication authentication;
 
     @TempDir
@@ -61,6 +67,7 @@ class AttachmentServiceTest {
                 attachmentRepository,
                 taskRepository,
                 userRepository,
+                projectMemberRepository,
                 tempUploadDir.toString()
         );
 
@@ -170,6 +177,30 @@ class AttachmentServiceTest {
         assertThrows(AccessDeniedException.class, () ->
                 attachmentService.deleteAttachment(10L, authentication)
         );
+    }
+
+    @Test
+    void uploadFile_ViewerRole_ThrowsAccessDenied() {
+        User viewerUser = new User();
+        viewerUser.setId(3L);
+        viewerUser.setEmail("viewer@taskflow.com");
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "belge.pdf", "application/pdf", "içerik".getBytes()
+        );
+
+        when(authentication.getName()).thenReturn(viewerUser.getEmail());
+        when(userRepository.findByEmail(viewerUser.getEmail())).thenReturn(Optional.of(viewerUser));
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(projectMemberRepository.findByProjectIdAndUserId(1L, 3L)).thenReturn(Optional.of(
+                ProjectMember.builder().project(project).user(viewerUser).role(ProjectRole.VIEWER).build()
+        ));
+
+        assertThrows(AccessDeniedException.class, () ->
+                attachmentService.uploadFile(1L, file, authentication)
+        );
+
+        verify(attachmentRepository, org.mockito.Mockito.never()).save(any(Attachment.class));
     }
 
     @Test

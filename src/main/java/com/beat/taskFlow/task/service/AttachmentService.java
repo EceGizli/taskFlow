@@ -19,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.project.entity.concretes.Project;
+import com.beat.taskFlow.project.entity.concretes.ProjectMember;
+import com.beat.taskFlow.project.entity.enums.ProjectRole;
+import com.beat.taskFlow.project.repository.ProjectMemberRepository;
 import com.beat.taskFlow.task.dto.responses.AttachmentResponse;
 import com.beat.taskFlow.task.entity.concretes.Attachment;
 import com.beat.taskFlow.task.entity.concretes.Task;
@@ -33,16 +36,19 @@ public class AttachmentService {
     private final AttachmentRepository attachmentRepository;
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
+    private final ProjectMemberRepository projectMemberRepository;
     private final Path fileStorageLocation;
 
     public AttachmentService(
             AttachmentRepository attachmentRepository,
             TaskRepository taskRepository,
             UserRepository userRepository,
+            ProjectMemberRepository projectMemberRepository,
             @Value("${file.upload-dir:uploads}") String uploadDir) {
         this.attachmentRepository = attachmentRepository;
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
+        this.projectMemberRepository = projectMemberRepository;
         this.fileStorageLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
 
         try {
@@ -58,7 +64,7 @@ public class AttachmentService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new NotFoundException("Görev bulunamadı: " + taskId));
 
-        checkProjectAccess(task.getProject(), currentUser);
+        validateWriteAccess(task.getProject(), currentUser);
 
         if (file.isEmpty()) {
             throw new IllegalArgumentException("Boş dosya yüklenemez.");
@@ -184,6 +190,10 @@ public class AttachmentService {
             throw new AccessDeniedException("Bu dosya ekini silme yetkiniz yok.");
         }
 
+        if (!isOwner) {
+            validateWriteAccess(project, currentUser);
+        }
+
         try {
             Path filePath = this.fileStorageLocation.resolve(attachment.getStoredFileName()).normalize();
             Files.deleteIfExists(filePath);
@@ -214,6 +224,19 @@ public class AttachmentService {
 
         if (!isOwner && !isMember) {
             throw new AccessDeniedException("Bu projenin görev dosyalarına erişim yetkiniz yok.");
+        }
+    }
+
+    private void validateWriteAccess(Project project, User user) {
+        if (project.getOwner() != null && project.getOwner().getId().equals(user.getId())) {
+            return;
+        }
+
+        ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(project.getId(), user.getId())
+                .orElseThrow(() -> new AccessDeniedException("Bu projenin görev dosyalarına erişim yetkiniz yok."));
+
+        if (member.getRole() == ProjectRole.VIEWER) {
+            throw new AccessDeniedException("VIEWER rolündeki üyeler dosya ekleyip silemez.");
         }
     }
 

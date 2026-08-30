@@ -21,6 +21,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import com.beat.taskFlow.common.exception.NotFoundException;
 import com.beat.taskFlow.project.entity.concretes.Project;
+import com.beat.taskFlow.project.entity.concretes.ProjectMember;
+import com.beat.taskFlow.project.entity.enums.ProjectRole;
+import com.beat.taskFlow.project.repository.ProjectMemberRepository;
 import com.beat.taskFlow.task.dto.requests.CreateCheckItemRequest;
 import com.beat.taskFlow.task.dto.requests.UpdateCheckItemRequest;
 import com.beat.taskFlow.task.dto.responses.CheckItemResponse;
@@ -43,6 +46,9 @@ class CheckItemServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private ProjectMemberRepository projectMemberRepository;
 
     @Mock
     private Authentication authentication;
@@ -164,6 +170,26 @@ class CheckItemServiceTest {
         when(authentication.getName()).thenReturn(otherUser.getEmail());
         when(userRepository.findByEmail(otherUser.getEmail())).thenReturn(Optional.of(otherUser));
         when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+
+        CreateCheckItemRequest request = new CreateCheckItemRequest("Yetkisiz İstek");
+
+        assertThrows(AccessDeniedException.class, () ->
+                checkItemService.createCheckItem(1L, request, authentication)
+        );
+    }
+
+    @Test
+    void createCheckItem_ViewerRole_ThrowsAccessDenied() {
+        User viewerUser = new User();
+        viewerUser.setId(3L);
+        viewerUser.setEmail("viewer@taskflow.com");
+
+        when(authentication.getName()).thenReturn(viewerUser.getEmail());
+        when(userRepository.findByEmail(viewerUser.getEmail())).thenReturn(Optional.of(viewerUser));
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(projectMemberRepository.findByProjectIdAndUserId(1L, 3L)).thenReturn(Optional.of(
+                ProjectMember.builder().project(project).user(viewerUser).role(ProjectRole.VIEWER).build()
+        ));
 
         CreateCheckItemRequest request = new CreateCheckItemRequest("Yetkisiz İstek");
 
