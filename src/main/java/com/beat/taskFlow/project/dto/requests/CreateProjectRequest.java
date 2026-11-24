@@ -10,7 +10,7 @@ public record CreateProjectRequest(
 
 	    String description,
 
-	    @Size(max = 20, message = "Renk en fazla 20 karakter olabilir")
+	    @Size(max = 7, message = "Renk en fazla 7 karakter olabilir")
 	    String color,
 
 	    @Size(max = 50, message = "Etiket en fazla 50 karakter olabilir")
