@@ -35,4 +35,4 @@ build/
 ### Hassas / Yerel yapılandırma dosyaları ###
 src/main/resources/application-local.properties
 *.env
-.env
+.envuploads/
