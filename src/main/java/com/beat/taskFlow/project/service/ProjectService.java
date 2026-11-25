@@ -244,7 +244,7 @@ public class ProjectService {
             throw new IllegalArgumentException("Kullanıcı zaten bu projenin sahibidir.");
         }
 
-        project.getMembers().remove(newOwner);
+        projectMemberRepository.deleteByProjectIdAndUserId(projectId, newOwner.getId());
         projectMemberRepository.save(ProjectMember.builder()
                 .project(project)
                 .user(currentUser)
