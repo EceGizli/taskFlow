@@ -245,8 +245,12 @@ public class ProjectService {
         }
 
         project.getMembers().remove(newOwner);
-        project.getMembers().add(currentUser);
-        project.setOwner(newOwner);
+        projectMemberRepository.save(ProjectMember.builder()
+                .project(project)
+                .user(currentUser)
+                .role(ProjectRole.EDITOR)
+                .build());        
+        project.setOwner(newOwner);        
 
         Project updatedProject = projectRepository.save(project);
         return convertToResponse(updatedProject);

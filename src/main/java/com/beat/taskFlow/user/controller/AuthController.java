@@ -87,10 +87,7 @@ public class AuthController {
         );
     }
     
-    @Operation(
-            summary = "Çıkış yap",
-            description = "Kullanıcının aktif refresh tokenlarını geçersiz hale getirir."
-    )
+    @Operation(summary = "Çıkış yap", description = "Kullanıcının aktif refresh tokenlarını geçersiz hale getirir.")
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/logout")
     public ResponseEntity<String> logout(Authentication authentication) {
